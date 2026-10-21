@@ -2,224 +2,379 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from '../../i18n';
 import { FinancialAssessmentInputs, InsuranceNeedsResult } from '../../types';
-import { calculateInsuranceNeeds, formatIndianCurrency } from '../../lib/calculator';
-import { DEMO_PROFILES, DemoProfilePackage } from '../../data/demoProfiles';
+import { calculateInsuranceNeeds, formatIndianCurrency, sanitizeFinancialInputs, calculateGrowthProjections } from '../../lib/calculator';
+import { StorageAdapter } from '../../lib/storage';
+import { useAuth } from '../../contexts/AuthContext';
+import { assessmentService } from '../../services/assessmentService';
 import {
-  LayoutDashboard, ShieldCheck, ShieldAlert, TrendingUp, Users,
-  ArrowRight, Sparkles, BarChart3, Home, GraduationCap,
-  PiggyBank, Building2, User, ChevronRight
+  ArrowRight,
+  ShieldCheck,
+  ShieldAlert,
+  Users,
+  Home,
+  GraduationCap,
+  PiggyBank,
+  Brain,
+  TrendingUp,
+  MessageSquare,
+  Shield,
+  Sparkles,
+  CheckCircle2
 } from 'lucide-react';
 
 export const DashboardPage: React.FC = () => {
   const { t } = useTranslation();
-  const [activeProfile, setActiveProfile] = useState<DemoProfilePackage>(DEMO_PROFILES[0]);
-  const [result, setResult] = useState<InsuranceNeedsResult | null>(null);
+  const { user, profile } = useAuth();
+
+  const [currentUser, setCurrentUser] = useState(() => profile || StorageAdapter.getUserProfile());
   const [inputs, setInputs] = useState<FinancialAssessmentInputs | null>(null);
+  const [result, setResult] = useState<InsuranceNeedsResult | null>(null);
+  const [mindsetCategory, setMindsetCategory] = useState<string | null>(null);
+  const [mindsetScore, setMindsetScore] = useState<number | null>(null);
 
   useEffect(() => {
-    // Try to load from session first, otherwise use active demo profile
+    if (profile) setCurrentUser(profile);
+  }, [profile]);
+
+  useEffect(() => {
     const stored = sessionStorage.getItem('lifemap_assessment');
     if (stored) {
       try {
-        const parsed = JSON.parse(stored);
+        const parsed = sanitizeFinancialInputs(JSON.parse(stored));
         setInputs(parsed);
         setResult(calculateInsuranceNeeds(parsed));
         return;
       } catch {}
     }
-    setInputs(activeProfile.inputs);
-    setResult(calculateInsuranceNeeds(activeProfile.inputs));
-  }, [activeProfile]);
 
-  const switchProfile = (profile: DemoProfilePackage) => {
-    setActiveProfile(profile);
-    setInputs(profile.inputs);
-    setResult(calculateInsuranceNeeds(profile.inputs));
-    sessionStorage.setItem('lifemap_assessment', JSON.stringify(profile.inputs));
-  };
+    // Default baseline inputs for user
+    const defaultInputs: FinancialAssessmentInputs = {
+      age: 32,
+      employmentType: 'salaried',
+      maritalStatus: 'married',
+      dependantsCount: 2,
+      supportDurationYears: 20,
+      monthlyIncome: 85000,
+      monthlyExpenses: 45000,
+      annualExpenseInflationRate: 0.06,
+      outstandingHomeLoan: 3500000,
+      outstandingOtherLoans: 0,
+      futureEducationCommitments: 2000000,
+      otherMajorObligations: 0,
+      liquidSavingsAndInvestments: 600000,
+      existingIndividualTermInsurance: 0,
+      existingEmployerTermInsurance: 2500000,
+      existingOtherPoliciesSumAssured: 0
+    };
+    setInputs(defaultInputs);
+    setResult(calculateInsuranceNeeds(defaultInputs));
+  }, []);
+
+  useEffect(() => {
+    if (user?.id) {
+      assessmentService.getOrCreateSession(user.id).then(({ session }) => {
+        if (session.status === 'completed') {
+          setMindsetCategory(session.mindsetCategory || null);
+          setMindsetScore(session.score || null);
+        }
+      });
+    }
+  }, [user]);
 
   if (!result || !inputs) return null;
 
-  const statusColors = {
-    critical_shortfall: { text: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200' },
-    moderate_shortfall: { text: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200' },
-    adequately_covered: { text: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200' },
-    surplus_coverage: { text: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200' },
-  };
-  const sc = statusColors[result.coverageStatus];
+  const displayName = currentUser.name || user?.email?.split('@')[0] || 'Member';
+
+  // Deterministic 10- and 20-year growth projection summary
+  const growthPreview = calculateGrowthProjections({
+    initialSavings: inputs.liquidSavingsAndInvestments || 500000,
+    monthlyContribution: Math.max(10000, inputs.monthlyIncome - inputs.monthlyExpenses),
+    annualInflation: inputs.annualExpenseInflationRate || 0.06,
+    baselineProtectionNeed: result.totalProtectionNeed
+  });
 
   return (
-    <div className="space-y-8 py-4">
-      {/* Dashboard Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+    <div className="space-y-8 py-4 max-w-6xl mx-auto">
+      {/* Title & Personalized Recommendation Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-brand-border pb-5">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <LayoutDashboard className="w-5 h-5 text-brand-teal" />
-            <span className="text-xs font-bold text-brand-teal uppercase tracking-wider">Dashboard</span>
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-teal-50 text-brand-teal text-[10px] font-bold uppercase tracking-wider mb-1">
+            <Sparkles className="w-3 h-3 text-brand-amber" /> Overview
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-brand-navy">
-            {activeProfile.name}'s LifeMap
+            Welcome, {displayName}
           </h1>
-          <p className="text-xs text-brand-textSecondary mt-1">{activeProfile.tagline}</p>
+          <p className="text-xs sm:text-sm text-brand-textSecondary mt-0.5">
+            {result.coverageGap > 0 ? (
+              <span className="text-red-700 font-medium">
+                Action Recommended: Uncovered protection gap of <strong>{formatIndianCurrency(result.coverageGap, true)}</strong>. Review pure term life options.
+              </span>
+            ) : (
+              <span className="text-emerald-700 font-medium">
+                Protected: Your existing coverage meets your calculated family safety net needs.
+              </span>
+            )}
+          </p>
         </div>
+
         <Link
-          to="/assessment"
-          className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-brand-navy hover:bg-brand-navyLight transition-all"
+          to="/plan"
+          className="self-start sm:self-auto inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-brand-navy hover:bg-brand-navyLight shadow-subtle transition-all"
         >
-          {t('editInputs')} <ChevronRight className="w-3.5 h-3.5" />
+          <span>View My Plan</span>
+          <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       </div>
 
-      {/* Profile Switcher */}
-      <div className="flex gap-3 overflow-x-auto pb-1">
-        {DEMO_PROFILES.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => switchProfile(p)}
-            className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-xs font-bold border transition-all ${
-              activeProfile.id === p.id
-                ? 'bg-brand-navy text-white border-brand-navy shadow-subtle'
-                : 'bg-white text-brand-navy border-brand-border hover:border-brand-teal'
-            }`}
-          >
-            {p.name}
-          </button>
-        ))}
-      </div>
-
-      {/* Top Metrics */}
+      {/* Four Metrics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-brand-navyDark to-brand-navy rounded-2xl p-5 text-white shadow-float border border-brand-teal/20">
-          <div className="flex items-center gap-2 mb-3">
-            <ShieldCheck className="w-4 h-4 text-brand-tealLight" />
-            <span className="text-[10px] font-bold tracking-wider text-brand-tealLight uppercase">{t('protectionNeed')}</span>
-          </div>
-          <p className="text-2xl font-black text-brand-tealLight">{formatIndianCurrency(result.totalProtectionNeed, true)}</p>
+        {/* 1. Protection Need (Navy to Indigo Gradient) */}
+        <div className="bg-gradient-to-br from-[#0B2545] via-[#103058] to-[#1E3A8A] text-white rounded-2xl p-5 border-2 border-[#1E3A8A] shadow-md space-y-2">
+          <span className="text-[10px] font-extrabold tracking-wider text-teal-300 uppercase block">
+            Protection Need
+          </span>
+          <p className="text-2xl sm:text-3xl font-black text-white">
+            {formatIndianCurrency(result.totalProtectionNeed, true)}
+          </p>
+          <p className="text-[11px] text-slate-200">
+            {formatIndianCurrency(result.totalProtectionNeed)}
+          </p>
         </div>
 
-        <div className="bg-white rounded-2xl p-5 border border-brand-border shadow-card">
-          <div className="flex items-center gap-2 mb-3">
-            <BarChart3 className="w-4 h-4 text-brand-navy" />
-            <span className="text-[10px] font-bold tracking-wider text-brand-textSecondary uppercase">{t('grossResponsibilities')}</span>
-          </div>
-          <p className="text-2xl font-black text-brand-navy">{formatIndianCurrency(result.grossResponsibilities, true)}</p>
-        </div>
-
-        <div className="bg-white rounded-2xl p-5 border border-brand-border shadow-card">
-          <div className="flex items-center gap-2 mb-3">
-            <Building2 className="w-4 h-4 text-brand-emerald" />
-            <span className="text-[10px] font-bold tracking-wider text-brand-textSecondary uppercase">{t('existingCoverage')}</span>
-          </div>
-          <p className="text-2xl font-black text-brand-navy">{formatIndianCurrency(result.existingTotalCoverage, true)}</p>
-          <div className="flex gap-2 mt-1 text-[10px]">
-            <span className="text-emerald-600 font-bold">Own: {formatIndianCurrency(result.existingIndividualCoverage, true)}</span>
-            <span className="text-amber-600 font-bold">Emp: {formatIndianCurrency(result.existingEmployerCoverage, true)}</span>
+        {/* 2. Existing Coverage (Emerald Gradient) */}
+        <div className="bg-gradient-to-br from-white via-emerald-50/30 to-teal-50/40 rounded-2xl p-5 border-2 border-emerald-200/90 shadow-xs space-y-2 hover:border-emerald-400 transition-all">
+          <span className="text-[10px] font-extrabold tracking-wider text-emerald-800 uppercase block">
+            Existing Coverage
+          </span>
+          <p className="text-2xl sm:text-3xl font-black text-brand-navy">
+            {formatIndianCurrency(result.existingTotalCoverage, true)}
+          </p>
+          <div className="flex items-center gap-3 text-[11px] text-brand-textSecondary">
+            <span>Own: <strong className="text-emerald-700">{formatIndianCurrency(result.existingIndividualCoverage, true)}</strong></span>
+            <span>•</span>
+            <span>Emp: <strong className="text-blue-700">{formatIndianCurrency(result.existingEmployerCoverage, true)}</strong></span>
           </div>
         </div>
 
-        <div className={`rounded-2xl p-5 border shadow-card ${sc.bg} ${sc.border}`}>
-          <div className="flex items-center gap-2 mb-3">
-            {result.coverageGap > 0 ? <ShieldAlert className={`w-4 h-4 ${sc.text}`} /> : <ShieldCheck className={`w-4 h-4 ${sc.text}`} />}
-            <span className="text-[10px] font-bold tracking-wider text-brand-textSecondary uppercase">{t('coverageGap')}</span>
-          </div>
-          <p className={`text-2xl font-black ${sc.text}`}>{formatIndianCurrency(result.coverageGap, true)}</p>
+        {/* 3. Coverage Gap (Rose/Red Alert Gradient) */}
+        <div className="bg-gradient-to-br from-white via-rose-50/50 to-red-50/60 rounded-2xl p-5 border-2 border-rose-300/90 shadow-xs space-y-2 hover:border-rose-400 transition-all">
+          <span className="text-[10px] font-extrabold tracking-wider text-rose-700 uppercase block">
+            Coverage Gap
+          </span>
+          <p className="text-2xl sm:text-3xl font-black text-red-700">
+            {formatIndianCurrency(result.coverageGap, true)}
+          </p>
+          <p className="text-[11px] text-red-600 font-semibold">
+            {result.coverageGap > 0 ? '⚠ Uncovered family shortfall' : '✓ Adequately protected'}
+          </p>
+        </div>
+
+        {/* 4. Family Responsibilities (Blue Gradient) */}
+        <div className="bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/30 rounded-2xl p-5 border-2 border-blue-200/90 shadow-xs space-y-2 hover:border-blue-400 transition-all">
+          <span className="text-[10px] font-extrabold tracking-wider text-blue-800 uppercase block">
+            Family Responsibilities
+          </span>
+          <p className="text-2xl sm:text-3xl font-black text-brand-navy">
+            {formatIndianCurrency(result.grossResponsibilities, true)}
+          </p>
+          <p className="text-[11px] text-brand-textSecondary font-medium">
+            Living support + debt obligations
+          </p>
         </div>
       </div>
 
-      {/* Key Breakdown & Goals Side-by-Side */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Financial Breakdown */}
-        <div className="bg-white rounded-2xl p-6 border border-brand-border shadow-subtle space-y-4">
-          <h3 className="text-sm font-bold text-brand-navy">Financial Responsibilities</h3>
+      {/* Assessment Status & 10- & 20-Year Projection Cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+        {/* Mindset Assessment Card */}
+        <div className="bg-white rounded-2xl p-5 sm:p-6 border border-brand-border shadow-subtle flex flex-col justify-between space-y-4">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-brand-navy flex items-center gap-1.5">
+                <Brain className="w-4 h-4 text-brand-teal" /> Financial Mindset Profile
+              </span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                mindsetCategory ? 'bg-teal-50 text-brand-teal' : 'bg-amber-50 text-amber-800'
+              }`}>
+                {mindsetCategory ? 'Completed' : 'Pending'}
+              </span>
+            </div>
+
+            {mindsetCategory ? (
+              <div className="space-y-2">
+                <h3 className="text-lg font-bold text-brand-navy">{mindsetCategory}</h3>
+                <p className="text-xs text-brand-textSecondary leading-relaxed">
+                  Your profile demonstrates structured financial discipline. Resilience score: <strong className="text-brand-navy">{mindsetScore}%</strong>.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <h3 className="text-sm font-bold text-brand-navy">Discover Your Protection Mindset</h3>
+                <p className="text-xs text-brand-textSecondary leading-relaxed">
+                  Take the randomized assessment to measure your family protection resilience, risk tolerance, and time horizon.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="pt-2">
+            <Link
+              to="/learning"
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-teal hover:text-brand-tealDark transition-colors"
+            >
+              <span>{mindsetCategory ? 'Review Mindset & Games' : 'Take Mindset Assessment'}</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        </div>
+
+        {/* 10- & 20-Year Projections Preview */}
+        <div className="bg-white rounded-2xl p-5 sm:p-6 border border-brand-border shadow-subtle flex flex-col justify-between space-y-4">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-brand-navy flex items-center gap-1.5">
+                <TrendingUp className="w-4 h-4 text-brand-teal" /> 10- & 20-Year Growth Projections
+              </span>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-brand-navy">
+                Moderate (10.0%)
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-brand-textSecondary block">10-Year Horizon</span>
+                <p className="text-base font-black text-brand-navy">
+                  {formatIndianCurrency(growthPreview.tenYear.moderate.nominal, true)}
+                </p>
+                <p className="text-[10px] text-slate-500">
+                  Real: {formatIndianCurrency(growthPreview.tenYear.moderate.real, true)}
+                </p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-teal-50/60 border border-teal-200/80 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-brand-teal block">20-Year Horizon</span>
+                <p className="text-base font-black text-brand-teal">
+                  {formatIndianCurrency(growthPreview.twentyYear.moderate.nominal, true)}
+                </p>
+                <p className="text-[10px] text-teal-800">
+                  Real: {formatIndianCurrency(growthPreview.twentyYear.moderate.real, true)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-2">
+            <Link
+              to="/plan?tab=10year"
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-teal hover:text-brand-tealDark transition-colors"
+            >
+              <span>Explore Wealth Outlook in My Plan</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Financial Breakdown */}
+      <div className="bg-white rounded-2xl p-5 sm:p-6 border border-brand-border shadow-subtle space-y-4">
+        <h2 className="text-sm font-bold text-brand-navy">
+          Financial Protection Breakdown
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-3">
             {[
-              { label: 'Family Living Support', value: result.futureFamilySupportTotal, icon: Users, color: 'text-brand-teal', bg: 'bg-teal-50' },
-              { label: 'Home Loan', value: inputs.outstandingHomeLoan, icon: Home, color: 'text-blue-600', bg: 'bg-blue-50' },
-              { label: 'Other Loans', value: inputs.outstandingOtherLoans, icon: PiggyBank, color: 'text-purple-600', bg: 'bg-purple-50' },
-              { label: 'Education & Milestones', value: result.futureCommitmentsTotal, icon: GraduationCap, color: 'text-amber-600', bg: 'bg-amber-50' },
-              { label: 'Liquid Assets (Offset)', value: -result.eligibleAssetsConsidered, icon: PiggyBank, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-            ].filter(item => item.value !== 0).map((item, i) => {
-              const Icon = item.icon;
-              const isNeg = item.value < 0;
+              { label: 'Family Living Support', amount: result.futureFamilySupportTotal, color: 'bg-brand-teal' },
+              { label: 'Home Loan Principal', amount: inputs.outstandingHomeLoan, color: 'bg-blue-600' },
+              { label: 'Education & Milestones', amount: result.futureCommitmentsTotal, color: 'bg-amber-600' },
+              { label: 'Liquid Assets (Offset)', amount: -result.eligibleAssetsConsidered, color: 'bg-emerald-600' },
+            ].filter(item => item.amount !== 0).map((item, idx) => {
+              const isOffset = item.amount < 0;
+              const absAmt = Math.abs(item.amount);
+              const maxAmt = Math.max(result.grossResponsibilities, 1);
+              const pct = Math.min(100, Math.round((absAmt / maxAmt) * 100));
+
               return (
-                <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-lg ${item.bg} flex items-center justify-center`}>
-                      <Icon className={`w-4 h-4 ${item.color}`} />
-                    </div>
-                    <span className="text-xs font-medium text-brand-navy">{item.label}</span>
+                <div key={idx} className="space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-medium text-brand-navy">{item.label}</span>
+                    <span className={`font-bold ${isOffset ? 'text-emerald-600' : 'text-brand-navy'}`}>
+                      {isOffset ? '− ' : ''}{formatIndianCurrency(absAmt, true)}
+                    </span>
                   </div>
-                  <span className={`text-sm font-bold ${isNeg ? 'text-emerald-600' : 'text-brand-navy'}`}>
-                    {isNeg ? '−' : ''}{formatIndianCurrency(Math.abs(item.value), true)}
-                  </span>
+                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${item.color}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
                 </div>
               );
             })}
           </div>
-        </div>
 
-        {/* Life Goals */}
-        <div className="bg-white rounded-2xl p-6 border border-brand-border shadow-subtle space-y-4">
-          <h3 className="text-sm font-bold text-brand-navy">Life Goals</h3>
-          {activeProfile.goals.length === 0 ? (
-            <p className="text-xs text-brand-textSecondary">No goals configured yet.</p>
-          ) : (
-            <div className="space-y-3">
-              {activeProfile.goals.map((goal) => (
-                <div key={goal.id} className="p-4 rounded-xl border border-brand-border hover:shadow-card transition-all space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      goal.priority === 'essential' ? 'bg-red-50 text-red-700' :
-                      goal.priority === 'high' ? 'bg-amber-50 text-amber-700' :
-                      'bg-slate-100 text-slate-600'
-                    }`}>
-                      {goal.priority.toUpperCase()}
-                    </span>
-                    <span className="text-xs font-bold text-brand-teal">{formatIndianCurrency(goal.targetAmount, true)}</span>
-                  </div>
-                  <h4 className="text-xs font-bold text-brand-navy">{goal.title}</h4>
-                  <p className="text-[10px] text-brand-textSecondary">{goal.description}</p>
-                  <span className="text-[10px] text-brand-textSecondary">Target: {goal.targetYears} years</span>
-                </div>
-              ))}
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-brand-textSecondary space-y-2 flex flex-col justify-between">
+            <div className="space-y-1">
+              <span className="font-bold text-brand-navy block">Deterministic Actuarial Logic</span>
+              <p className="leading-relaxed text-[11px]">
+                LifeMap calculates pure protection requirements by discounting future family living costs with expected inflation (6% p.a.), adding liabilities, and subtracting liquid investments.
+              </p>
             </div>
-          )}
+            <Link
+              to="/plan"
+              className="text-xs font-bold text-brand-teal hover:underline inline-flex items-center gap-1 self-start"
+            >
+              <span>View Full Calculations</span>
+              <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
         </div>
       </div>
 
-      {/* Primary Drivers */}
-      <div className="bg-white rounded-2xl p-6 border border-brand-border shadow-subtle space-y-3">
-        <h3 className="text-sm font-bold text-brand-navy flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-brand-teal" /> Key Insights & Drivers
-        </h3>
-        {result.primaryDrivers.map((d, i) => (
-          <div key={i} className="flex gap-2.5 text-xs text-brand-textSecondary leading-relaxed">
-            <Sparkles className="w-3.5 h-3.5 text-brand-amber flex-shrink-0 mt-0.5" />
-            <span>{d}</span>
+      {/* 4 Primary Navigation Destination Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Link
+          to="/schemes"
+          className="p-4 rounded-2xl border-2 border-blue-200/90 bg-gradient-to-br from-white via-white to-blue-50/50 hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/10 transition-all space-y-2 shadow-xs text-left group"
+        >
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-transform">
+            <Shield className="w-4 h-4" />
           </div>
-        ))}
-      </div>
+          <span className="text-xs font-bold text-brand-navy block">Insurance Schemes</span>
+          <span className="text-[10px] text-brand-textSecondary block">Browse & compare official plans</span>
+        </Link>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {[
-          { label: 'Assessment', to: '/assessment', icon: User, color: 'text-brand-navy' },
-          { label: 'Calculator', to: '/calculator', icon: BarChart3, color: 'text-brand-teal' },
-          { label: 'Simulator', to: '/simulator', icon: TrendingUp, color: 'text-brand-blue' },
-          { label: 'Games', to: '/games', icon: Sparkles, color: 'text-brand-amber' },
-        ].map((action) => {
-          const Icon = action.icon;
-          return (
-            <Link
-              key={action.to}
-              to={action.to}
-              className="group bg-white rounded-xl p-4 border border-brand-border shadow-subtle hover:shadow-card hover:-translate-y-0.5 transition-all text-center space-y-2"
-            >
-              <Icon className={`w-6 h-6 mx-auto ${action.color} group-hover:scale-110 transition-transform`} />
-              <span className="text-xs font-bold text-brand-navy">{action.label}</span>
-            </Link>
-          );
-        })}
+        <Link
+          to="/plan"
+          className="p-4 rounded-2xl border-2 border-teal-200/90 bg-gradient-to-br from-white via-white to-teal-50/50 hover:border-teal-400 hover:shadow-lg hover:shadow-teal-500/10 transition-all space-y-2 shadow-xs text-left group"
+        >
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-transform">
+            <ShieldCheck className="w-4 h-4" />
+          </div>
+          <span className="text-xs font-bold text-brand-navy block">My Plan</span>
+          <span className="text-[10px] text-brand-textSecondary block">Coverage gap & 10/20-yr projections</span>
+        </Link>
+
+        <Link
+          to="/learning"
+          className="p-4 rounded-2xl border-2 border-purple-200/90 bg-gradient-to-br from-white via-white to-purple-50/50 hover:border-purple-400 hover:shadow-lg hover:shadow-purple-500/10 transition-all space-y-2 shadow-xs text-left group"
+        >
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-r from-purple-500 to-pink-600 flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-transform">
+            <Brain className="w-4 h-4" />
+          </div>
+          <span className="text-xs font-bold text-brand-navy block">Financial Learning</span>
+          <span className="text-[10px] text-brand-textSecondary block">Mindset assessment & challenges</span>
+        </Link>
+
+        <Link
+          to="/chat"
+          className="p-4 rounded-2xl border-2 border-amber-200/90 bg-gradient-to-br from-white via-white to-amber-50/50 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-500/10 transition-all space-y-2 shadow-xs text-left group"
+        >
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-transform">
+            <MessageSquare className="w-4 h-4" />
+          </div>
+          <span className="text-xs font-bold text-brand-navy block">AI Assistant</span>
+          <span className="text-[10px] text-brand-textSecondary block">Context-aware advice & history</span>
+        </Link>
       </div>
     </div>
   );

@@ -1,16 +1,20 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from '../../i18n';
 import { FinancialAssessmentInputs } from '../../types';
 import { DEMO_PROFILES } from '../../data/demoProfiles';
 import { formatIndianCurrency, sanitizeFinancialInputs } from '../../lib/calculator';
 import {
-  User, Briefcase, Heart, Users, Clock, IndianRupee, Home,
-  Car, GraduationCap, PiggyBank, ShieldCheck, Building2,
-  ChevronRight, ChevronLeft, Sparkles, CheckCircle2, AlertTriangle
+  User,
+  IndianRupee,
+  Home,
+  ShieldCheck,
+  ChevronRight,
+  ChevronLeft,
+  AlertTriangle
 } from 'lucide-react';
 
-const STEPS = ['Personal', 'Income & Expenses', 'Debts & Goals', 'Existing Coverage', 'Review'];
+const STEPS = ['Personal', 'Income & Expenses', 'Debts & Goals', 'Current Coverage'];
 
 const defaultInputs: FinancialAssessmentInputs = {
   age: 30,
@@ -35,7 +39,16 @@ export const AssessmentPage: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
-  const [inputs, setInputs] = useState<FinancialAssessmentInputs>(defaultInputs);
+
+  const [inputs, setInputs] = useState<FinancialAssessmentInputs>(() => {
+    const stored = sessionStorage.getItem('lifemap_assessment');
+    if (stored) {
+      try {
+        return sanitizeFinancialInputs(JSON.parse(stored));
+      } catch {}
+    }
+    return defaultInputs;
+  });
 
   const update = (field: keyof FinancialAssessmentInputs, value: any) => {
     setInputs((prev) => ({ ...prev, [field]: value }));
@@ -43,7 +56,10 @@ export const AssessmentPage: React.FC = () => {
 
   const loadDemo = (profileId: string) => {
     const profile = DEMO_PROFILES.find((p) => p.id === profileId);
-    if (profile) setInputs({ ...profile.inputs });
+    if (profile) {
+      setInputs({ ...profile.inputs });
+      sessionStorage.setItem('lifemap_assessment', JSON.stringify(profile.inputs));
+    }
   };
 
   const handleSubmit = () => {
@@ -79,12 +95,13 @@ export const AssessmentPage: React.FC = () => {
         )}
         <input
           type="number"
-          value={value || ''}
+          value={value === 0 ? '' : value}
+          placeholder="0"
           min={min}
           max={max}
           step={step}
           onChange={(e) => update(field, Number(e.target.value))}
-          className={`w-full rounded-xl border border-brand-border bg-white px-3 py-2.5 text-sm font-medium text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal transition-all ${prefix ? 'pl-8' : ''}`}
+          className={`w-full rounded-xl border border-brand-border bg-white px-3 py-2 text-xs font-semibold text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal transition-all ${prefix ? 'pl-8' : ''}`}
         />
         {suffix && (
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-brand-textSecondary">{suffix}</span>
@@ -95,200 +112,195 @@ export const AssessmentPage: React.FC = () => {
   );
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8 py-4">
-      {/* Header */}
-      <div className="text-center space-y-2">
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-brand-navy">{t('assessmentTitle')}</h1>
-        <p className="text-sm text-brand-textSecondary">{t('assessmentSub')}</p>
+    <div className="max-w-2xl mx-auto space-y-6 py-4">
+      {/* Plan Workflow Navigation Tabs */}
+      <div className="flex items-center justify-center">
+        <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-brand-border">
+          <button
+            type="button"
+            className="px-4 py-1.5 rounded-lg text-xs font-bold bg-white text-brand-navy shadow-subtle"
+          >
+            1. Financial Assessment
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            className="px-4 py-1.5 rounded-lg text-xs font-medium text-brand-textSecondary hover:text-brand-navy transition-colors"
+          >
+            2. Needs Calculator
+          </button>
+        </div>
       </div>
 
-      {/* Demo Profiles Quick Start */}
-      <div className="bg-gradient-to-r from-teal-50 to-blue-50 rounded-2xl p-5 border border-brand-border">
-        <div className="flex items-center gap-2 mb-3">
-          <Sparkles className="w-4 h-4 text-brand-amber" />
-          <span className="text-xs font-bold text-brand-navy">{t('quickStartProfiles')}</span>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {/* Primary Heading */}
+      <div className="text-center space-y-1">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-brand-navy">
+          Financial & Family Assessment
+        </h1>
+        <p className="text-xs text-brand-textSecondary">
+          Provide your circumstances to calculate an explainable, transparent protection need.
+        </p>
+      </div>
+
+      {/* Quick Demo Selector */}
+      <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-brand-border text-xs">
+        <span className="text-brand-textSecondary font-medium">Quick Start Demo:</span>
+        <div className="flex items-center gap-1.5">
           {DEMO_PROFILES.map((p) => (
             <button
               key={p.id}
               onClick={() => loadDemo(p.id)}
-              className="text-left p-3 rounded-xl bg-white border border-brand-border hover:border-brand-teal hover:shadow-card transition-all group"
+              className="px-2.5 py-1 rounded-lg border border-brand-border bg-white hover:bg-slate-50 text-[11px] font-semibold text-brand-navy transition-colors"
             >
-              <span className="text-[10px] font-bold text-brand-teal">{p.badge}</span>
-              <h4 className="text-xs font-bold text-brand-navy mt-0.5">{p.name}</h4>
-              <p className="text-[10px] text-brand-textSecondary mt-0.5">{p.tagline}</p>
+              {p.name.split(' ')[0]}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Step Progress Bar */}
-      <div className="flex items-center gap-1">
+      {/* Step Progress Indicators */}
+      <div className="grid grid-cols-4 gap-2 text-center text-xs">
         {STEPS.map((s, idx) => (
-          <React.Fragment key={idx}>
-            <button
-              onClick={() => setStep(idx)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all ${
-                idx === step
-                  ? 'bg-brand-navy text-white shadow-subtle'
-                  : idx < step
-                  ? 'bg-brand-tealSoft text-brand-tealDark'
-                  : 'bg-slate-100 text-brand-textSecondary'
-              }`}
-            >
-              {idx < step ? <CheckCircle2 className="w-3 h-3" /> : null}
-              <span className="hidden sm:inline">{s}</span>
-              <span className="sm:hidden">{idx + 1}</span>
-            </button>
-            {idx < STEPS.length - 1 && <div className="flex-1 h-0.5 bg-slate-200 rounded" />}
-          </React.Fragment>
+          <button
+            key={idx}
+            onClick={() => setStep(idx)}
+            className={`py-2 px-1 rounded-lg font-bold border transition-colors ${
+              idx === step
+                ? 'bg-brand-navy text-white border-brand-navy'
+                : idx < step
+                ? 'bg-slate-50 text-brand-teal border-brand-teal/30'
+                : 'bg-white text-brand-textSecondary border-brand-border'
+            }`}
+          >
+            <span className="text-[10px] block text-slate-400 font-normal">Step {idx + 1}</span>
+            <span className="truncate block text-[11px]">{s}</span>
+          </button>
         ))}
       </div>
 
-      {/* Step Content */}
-      <div className="bg-white rounded-2xl border border-brand-border shadow-card p-6 sm:p-8 space-y-6">
+      {/* Form Content Card */}
+      <div className="bg-white rounded-2xl border border-brand-border shadow-subtle p-6 space-y-5">
         {step === 0 && (
-          <div className="space-y-5">
-            <h2 className="text-lg font-bold text-brand-navy flex items-center gap-2">
-              <User className="w-5 h-5 text-brand-teal" /> {t('stepPersonal')}
+          <div className="space-y-4">
+            <h2 className="text-sm font-bold text-brand-navy flex items-center gap-2">
+              <User className="w-4 h-4 text-brand-teal" /> Personal & Family Details
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <InputField label={t('ageLabel')} value={inputs.age} field="age" prefix="" suffix="years" min={18} max={80} />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <InputField label="Your Age" value={inputs.age} field="age" prefix="" suffix="years" min={18} max={80} />
+              
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-brand-navy">{t('employmentLabel')}</label>
+                <label className="block text-xs font-bold text-brand-navy">Employment Type</label>
                 <select
                   value={inputs.employmentType}
                   onChange={(e) => update('employmentType', e.target.value)}
-                  className="w-full rounded-xl border border-brand-border bg-white px-3 py-2.5 text-sm font-medium text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal/40"
+                  className="w-full rounded-xl border border-brand-border bg-white px-3 py-2 text-xs font-semibold text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal/40"
                 >
                   <option value="salaried">Salaried Employee</option>
                   <option value="self_employed">Self-Employed</option>
                   <option value="business">Business Owner</option>
                   <option value="freelancer">Freelancer</option>
                   <option value="homemaker">Homemaker</option>
-                  <option value="student">Student</option>
                 </select>
               </div>
+
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-brand-navy">{t('maritalLabel')}</label>
+                <label className="block text-xs font-bold text-brand-navy">Marital Status</label>
                 <select
                   value={inputs.maritalStatus}
                   onChange={(e) => update('maritalStatus', e.target.value)}
-                  className="w-full rounded-xl border border-brand-border bg-white px-3 py-2.5 text-sm font-medium text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal/40"
+                  className="w-full rounded-xl border border-brand-border bg-white px-3 py-2 text-xs font-semibold text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal/40"
                 >
                   <option value="single">Single</option>
                   <option value="married">Married</option>
                   <option value="other">Other</option>
                 </select>
               </div>
-              <InputField label={t('dependantsLabel')} value={inputs.dependantsCount} field="dependantsCount" prefix="" min={0} max={10} />
-              <InputField
-                label={t('supportYearsLabel')}
-                value={inputs.supportDurationYears}
-                field="supportDurationYears"
-                prefix=""
-                suffix="years"
-                min={1}
-                max={40}
-                hint="How long your dependants need financial support"
-              />
+
+              <InputField label="Number of Dependants" value={inputs.dependantsCount} field="dependantsCount" prefix="" min={0} max={10} />
+
+              <div className="sm:col-span-2">
+                <InputField
+                  label="Support Duration"
+                  value={inputs.supportDurationYears}
+                  field="supportDurationYears"
+                  prefix=""
+                  suffix="years"
+                  min={1}
+                  max={40}
+                  hint="Number of years your dependants need living cost protection"
+                />
+              </div>
             </div>
           </div>
         )}
 
         {step === 1 && (
-          <div className="space-y-5">
-            <h2 className="text-lg font-bold text-brand-navy flex items-center gap-2">
-              <IndianRupee className="w-5 h-5 text-brand-teal" /> {t('stepFinancial')}
+          <div className="space-y-4">
+            <h2 className="text-sm font-bold text-brand-navy flex items-center gap-2">
+              <IndianRupee className="w-4 h-4 text-brand-teal" /> Income & Living Expenses
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <InputField label={t('monthlyIncomeLabel')} value={inputs.monthlyIncome} field="monthlyIncome" step={5000} hint="Take-home pay after taxes" />
-              <InputField label={t('monthlyExpensesLabel')} value={inputs.monthlyExpenses} field="monthlyExpenses" step={5000} hint="Total household spending per month" />
-              <div className="space-y-1.5 sm:col-span-2">
-                <label className="block text-xs font-bold text-brand-navy">{t('inflationLabel')}</label>
-                <div className="flex items-center gap-4">
-                  <input
-                    type="range"
-                    min={0.03}
-                    max={0.12}
-                    step={0.005}
-                    value={inputs.annualExpenseInflationRate}
-                    onChange={(e) => update('annualExpenseInflationRate', Number(e.target.value))}
-                    className="flex-1 accent-brand-teal cursor-pointer"
-                  />
-                  <span className="text-sm font-bold text-brand-teal w-12 text-right">
-                    {(inputs.annualExpenseInflationRate * 100).toFixed(1)}%
-                  </span>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <InputField label="Monthly Take-Home Income" value={inputs.monthlyIncome} field="monthlyIncome" step={5000} hint="Net in-hand pay" />
+              <InputField label="Monthly Household Expenses" value={inputs.monthlyExpenses} field="monthlyExpenses" step={5000} hint="Family living costs" />
+
+              <div className="space-y-1.5 sm:col-span-2 pt-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-brand-navy">Assumed Inflation Rate</span>
+                  <span className="font-extrabold text-brand-teal">{(inputs.annualExpenseInflationRate * 100).toFixed(1)}%</span>
                 </div>
+                <input
+                  type="range"
+                  min={0.03}
+                  max={0.12}
+                  step={0.005}
+                  value={inputs.annualExpenseInflationRate}
+                  onChange={(e) => update('annualExpenseInflationRate', Number(e.target.value))}
+                  className="w-full accent-brand-teal cursor-pointer"
+                />
+                <p className="text-[10px] text-brand-textSecondary">Expected annual inflation for future living costs</p>
               </div>
             </div>
           </div>
         )}
 
         {step === 2 && (
-          <div className="space-y-5">
-            <h2 className="text-lg font-bold text-brand-navy flex items-center gap-2">
-              <Home className="w-5 h-5 text-brand-teal" /> {t('stepDependants')}
+          <div className="space-y-4">
+            <h2 className="text-sm font-bold text-brand-navy flex items-center gap-2">
+              <Home className="w-4 h-4 text-brand-teal" /> Debts & Major Milestones
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <InputField label={t('homeLoanLabel')} value={inputs.outstandingHomeLoan} field="outstandingHomeLoan" step={100000} hint="Outstanding principal balance" />
-              <InputField label={t('otherLoansLabel')} value={inputs.outstandingOtherLoans} field="outstandingOtherLoans" step={50000} />
-              <InputField label={t('educationLabel')} value={inputs.futureEducationCommitments} field="futureEducationCommitments" step={100000} hint="Future higher education costs" />
-              <InputField label="Other Major Obligations" value={inputs.otherMajorObligations} field="otherMajorObligations" step={50000} hint="Medical, parental care, etc." />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <InputField label="Outstanding Home Loan" value={inputs.outstandingHomeLoan} field="outstandingHomeLoan" step={100000} hint="Principal balance remaining" />
+              <InputField label="Other Debts & Loans" value={inputs.outstandingOtherLoans} field="outstandingOtherLoans" step={50000} hint="Car, personal, education loans" />
+              <InputField label="Future Education Commitments" value={inputs.futureEducationCommitments} field="futureEducationCommitments" step={100000} hint="Higher education milestones" />
+              <InputField label="Other Major Obligations" value={inputs.otherMajorObligations} field="otherMajorObligations" step={50000} hint="Parental care, health reserves" />
             </div>
           </div>
         )}
 
         {step === 3 && (
-          <div className="space-y-5">
-            <h2 className="text-lg font-bold text-brand-navy flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-brand-teal" /> {t('stepExisting')}
+          <div className="space-y-4">
+            <h2 className="text-sm font-bold text-brand-navy flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-brand-teal" /> Current Coverage & Assets
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <InputField label={t('savingsLabel')} value={inputs.liquidSavingsAndInvestments} field="liquidSavingsAndInvestments" step={100000} hint="FDs, MFs, emergency savings" />
-              <InputField label={t('individualInsuranceLabel')} value={inputs.existingIndividualTermInsurance} field="existingIndividualTermInsurance" step={500000} />
-              <InputField label={t('employerInsuranceLabel')} value={inputs.existingEmployerTermInsurance} field="existingEmployerTermInsurance" step={500000} />
-              <InputField label={t('otherInsuranceLabel')} value={inputs.existingOtherPoliciesSumAssured} field="existingOtherPoliciesSumAssured" step={100000} />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <InputField label="Liquid Savings & Investments" value={inputs.liquidSavingsAndInvestments} field="liquidSavingsAndInvestments" step={100000} hint="FDs, mutual funds, emergency cash" />
+              <InputField label="Existing Individual Term Cover" value={inputs.existingIndividualTermInsurance} field="existingIndividualTermInsurance" step={500000} hint="Personal term life policy" />
+              <InputField label="Employer Group Life Cover" value={inputs.existingEmployerTermInsurance} field="existingEmployerTermInsurance" step={500000} hint="Corporate group cover" />
+              <InputField label="Other Traditional Policies" value={inputs.existingOtherPoliciesSumAssured} field="existingOtherPoliciesSumAssured" step={100000} hint="ULIP / Endowment sum assured" />
             </div>
+
             {inputs.existingEmployerTermInsurance > 0 && inputs.existingIndividualTermInsurance === 0 && (
-              <div className="flex gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
-                <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="text-xs font-bold text-amber-800">{t('employerWarningTitle')}</h4>
-                  <p className="text-[11px] text-amber-700 mt-1">{t('employerWarningDesc')}</p>
-                </div>
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 flex gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                <p className="text-[11px] leading-relaxed">
+                  <strong>Notice:</strong> Relying solely on employer group cover leaves you unprotected if you switch jobs or retire. Individual term cover provides lifelong portable safety.
+                </p>
               </div>
             )}
-          </div>
-        )}
-
-        {step === 4 && (
-          <div className="space-y-5">
-            <h2 className="text-lg font-bold text-brand-navy flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-brand-emerald" /> {t('reviewConfirm')}
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {[
-                { label: 'Age', value: `${inputs.age} years` },
-                { label: 'Dependants', value: inputs.dependantsCount.toString() },
-                { label: 'Support Duration', value: `${inputs.supportDurationYears} years` },
-                { label: 'Monthly Income', value: formatIndianCurrency(inputs.monthlyIncome) },
-                { label: 'Monthly Expenses', value: formatIndianCurrency(inputs.monthlyExpenses) },
-                { label: 'Inflation Rate', value: `${(inputs.annualExpenseInflationRate * 100).toFixed(1)}%` },
-                { label: 'Home Loan', value: formatIndianCurrency(inputs.outstandingHomeLoan) },
-                { label: 'Other Loans', value: formatIndianCurrency(inputs.outstandingOtherLoans) },
-                { label: 'Education Fund', value: formatIndianCurrency(inputs.futureEducationCommitments) },
-                { label: 'Savings', value: formatIndianCurrency(inputs.liquidSavingsAndInvestments) },
-                { label: 'Individual Term', value: formatIndianCurrency(inputs.existingIndividualTermInsurance) },
-                { label: 'Employer Cover', value: formatIndianCurrency(inputs.existingEmployerTermInsurance) },
-              ].map((item, i) => (
-                <div key={i} className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                  <span className="text-[10px] text-brand-textSecondary font-medium">{item.label}</span>
-                  <p className="text-sm font-bold text-brand-navy mt-0.5">{item.value}</p>
-                </div>
-              ))}
-            </div>
           </div>
         )}
 
@@ -297,25 +309,25 @@ export const AssessmentPage: React.FC = () => {
           <button
             onClick={() => setStep(Math.max(0, step - 1))}
             disabled={step === 0}
-            className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-bold text-brand-navy bg-slate-100 hover:bg-slate-200 disabled:opacity-40 transition-all"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-brand-navy bg-slate-100 hover:bg-slate-200 disabled:opacity-40 transition-colors"
           >
-            <ChevronLeft className="w-3.5 h-3.5" /> {t('back')}
+            <ChevronLeft className="w-3.5 h-3.5" /> Previous
           </button>
 
           {step < STEPS.length - 1 ? (
             <button
               onClick={() => setStep(step + 1)}
               disabled={!canNext()}
-              className="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-brand-navy hover:bg-brand-navyLight disabled:opacity-40 transition-all"
+              className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold text-white bg-brand-navy hover:bg-brand-navyLight disabled:opacity-40 transition-colors"
             >
-              {t('next')} <ChevronRight className="w-3.5 h-3.5" />
+              Next <ChevronRight className="w-3.5 h-3.5" />
             </button>
           ) : (
             <button
               onClick={handleSubmit}
-              className="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-xl text-xs font-extrabold text-brand-navyDark bg-gradient-to-r from-brand-tealLight to-brand-emerald hover:brightness-105 shadow-subtle transition-all"
+              className="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-brand-navy hover:bg-brand-navyLight shadow-subtle transition-all"
             >
-              Calculate My Protection Need <ChevronRight className="w-3.5 h-3.5" />
+              Calculate Protection Need <ChevronRight className="w-3.5 h-3.5" />
             </button>
           )}
         </div>

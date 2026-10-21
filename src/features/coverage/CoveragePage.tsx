@@ -1,195 +1,200 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from '../../i18n';
-import { InsuranceNeedsResult, FinancialAssessmentInputs } from '../../types';
-import { calculateInsuranceNeeds, formatIndianCurrency } from '../../lib/calculator';
+import { InsuranceNeedsResult } from '../../types';
+import { calculateInsuranceNeeds, formatIndianCurrency, sanitizeFinancialInputs } from '../../lib/calculator';
 import { DEMO_PROFILES } from '../../data/demoProfiles';
-import {
-  ShieldCheck, ShieldAlert, Building2, User, AlertTriangle,
-  ArrowRight, Info, TrendingDown, Lock
-} from 'lucide-react';
+import { ArrowRight, AlertTriangle } from 'lucide-react';
 
 export const CoveragePage: React.FC = () => {
   const { t } = useTranslation();
   const [result, setResult] = useState<InsuranceNeedsResult | null>(null);
 
   useEffect(() => {
-    const stored = sessionStorage.getItem('lifemap_result');
-    if (stored) {
-      try { setResult(JSON.parse(stored)); } catch {}
-    } else {
-      const storedInputs = sessionStorage.getItem('lifemap_assessment');
-      if (storedInputs) {
-        try { setResult(calculateInsuranceNeeds(JSON.parse(storedInputs))); } catch {}
-      } else {
-        setResult(calculateInsuranceNeeds(DEMO_PROFILES[0].inputs));
-      }
+    const storedResult = sessionStorage.getItem('lifemap_result');
+    if (storedResult) {
+      try {
+        setResult(JSON.parse(storedResult));
+        return;
+      } catch {}
     }
+
+    const storedInputs = sessionStorage.getItem('lifemap_assessment');
+    if (storedInputs) {
+      try {
+        const parsed = sanitizeFinancialInputs(JSON.parse(storedInputs));
+        setResult(calculateInsuranceNeeds(parsed));
+        return;
+      } catch {}
+    }
+
+    setResult(calculateInsuranceNeeds(DEMO_PROFILES[0].inputs));
   }, []);
 
-  if (!result) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 space-y-4">
-        <p className="text-sm text-brand-textSecondary">No calculation data available.</p>
-        <Link to="/assessment" className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-brand-navy">Start Assessment</Link>
-      </div>
-    );
-  }
+  if (!result) return null;
 
   const individual = result.existingIndividualCoverage;
   const employer = result.existingEmployerCoverage;
-  const total = result.existingTotalCoverage;
+  const need = Math.max(result.totalProtectionNeed, 1);
   const gap = result.coverageGap;
-  const need = result.totalProtectionNeed;
-  const employerPct = total > 0 ? Math.round((employer / total) * 100) : 0;
-  const individualPct = total > 0 ? Math.round((individual / total) * 100) : 0;
 
-  const isFullyEmployerDependent = employer > 0 && individual === 0;
-  const gapPct = need > 0 ? Math.min(100, Math.round((gap / need) * 100)) : 0;
-  const coveredPct = 100 - gapPct;
+  const individualPct = Math.min(100, Math.round((individual / need) * 100));
+  const employerPct = Math.min(100 - individualPct, Math.round((employer / need) * 100));
+  const gapPct = Math.max(0, 100 - individualPct - employerPct);
+
+  const isEmployerOnly = employer > 0 && individual === 0;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 py-4">
-      <div className="text-center space-y-2">
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-brand-navy">Coverage Gap Analysis</h1>
-        <p className="text-sm text-brand-textSecondary">
-          Compare your existing protection against calculated needs and identify your true shortfall.
+    <div className="max-w-3xl mx-auto space-y-8 py-4">
+      {/* Title & Subtitle */}
+      <div className="text-center space-y-1">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-brand-navy">
+          Your Coverage Gap
+        </h1>
+        <p className="text-xs sm:text-sm text-brand-textSecondary">
+          See what you have and what may be missing.
         </p>
       </div>
 
-      {/* Visual Gap Meter */}
-      <div className="bg-white rounded-2xl p-6 sm:p-8 border border-brand-border shadow-card space-y-6">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-brand-navy">Protection Coverage vs Need</h3>
-          <span className={`text-xs font-bold px-3 py-1 rounded-full ${
-            gap > 0 ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-          }`}>
-            {gap > 0 ? `${gapPct}% Shortfall` : 'Adequately Covered'}
-          </span>
+      {/* Single Clear Visual Card */}
+      <div className="bg-white rounded-2xl p-6 sm:p-8 border border-brand-border shadow-subtle space-y-6">
+        {/* Header Summary Row */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-brand-border pb-4">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-brand-textSecondary">Total Protection Need</span>
+            <p className="text-xl sm:text-2xl font-black text-brand-navy">
+              {formatIndianCurrency(result.totalProtectionNeed, true)}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-4 text-xs">
+            <div>
+              <span className="text-[10px] text-brand-textSecondary block uppercase font-medium">Existing Coverage</span>
+              <span className="font-bold text-brand-navy">{formatIndianCurrency(result.existingTotalCoverage, true)}</span>
+            </div>
+            <div className="h-7 w-px bg-slate-200" />
+            <div>
+              <span className="text-[10px] text-red-600 block uppercase font-medium">Uncovered Gap</span>
+              <span className="font-bold text-red-700">{formatIndianCurrency(gap, true)}</span>
+            </div>
+          </div>
         </div>
 
-        {/* Stacked Bar */}
-        <div className="space-y-2">
-          <div className="h-8 bg-slate-100 rounded-full overflow-hidden flex">
+        {/* One Segmented Progress Bar */}
+        <div className="space-y-3">
+          <div className="h-6 w-full bg-slate-100 rounded-full overflow-hidden flex shadow-inner">
             {individualPct > 0 && (
               <div
-                className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 flex items-center justify-center transition-all duration-700"
-                style={{ width: `${Math.max(2, (individual / need) * 100)}%` }}
+                className="h-full bg-brand-emerald flex items-center justify-center transition-all duration-500"
+                style={{ width: `${individualPct}%` }}
+                title={`Individual: ${individualPct}%`}
               >
-                <span className="text-[9px] font-bold text-white truncate px-1">Individual</span>
+                {individualPct >= 12 && (
+                  <span className="text-[10px] font-bold text-white truncate px-1">
+                    {individualPct}%
+                  </span>
+                )}
               </div>
             )}
             {employerPct > 0 && (
               <div
-                className="h-full bg-gradient-to-r from-amber-400 to-amber-300 flex items-center justify-center transition-all duration-700"
-                style={{ width: `${Math.max(2, (employer / need) * 100)}%` }}
+                className="h-full bg-brand-amber flex items-center justify-center transition-all duration-500"
+                style={{ width: `${employerPct}%` }}
+                title={`Employer: ${employerPct}%`}
               >
-                <span className="text-[9px] font-bold text-amber-900 truncate px-1">Employer</span>
+                {employerPct >= 12 && (
+                  <span className="text-[10px] font-bold text-white truncate px-1">
+                    {employerPct}%
+                  </span>
+                )}
               </div>
             )}
             {gap > 0 && (
               <div
-                className="h-full bg-gradient-to-r from-red-400 to-red-300 flex items-center justify-center flex-1 transition-all duration-700"
+                className="h-full bg-red-400 flex items-center justify-center flex-1 transition-all duration-500"
+                title={`Gap: ${gapPct}%`}
               >
-                <span className="text-[9px] font-bold text-white truncate px-1">Gap: {formatIndianCurrency(gap, true)}</span>
+                {gapPct >= 12 && (
+                  <span className="text-[10px] font-bold text-white truncate px-1">
+                    {gapPct}% Gap
+                  </span>
+                )}
               </div>
             )}
           </div>
 
-          <div className="flex items-center justify-between text-[10px] text-brand-textSecondary">
-            <span>₹0</span>
-            <span>Need: {formatIndianCurrency(need, true)}</span>
+          {/* Short Legend */}
+          <div className="flex flex-wrap items-center justify-between gap-3 text-xs pt-1">
+            <span className="flex items-center gap-1.5 text-brand-navy">
+              <span className="w-2.5 h-2.5 rounded-full bg-brand-emerald" />
+              <span>Individual Term ({formatIndianCurrency(individual, true)})</span>
+            </span>
+
+            <span className="flex items-center gap-1.5 text-brand-navy">
+              <span className="w-2.5 h-2.5 rounded-full bg-brand-amber" />
+              <span>Employer Group ({formatIndianCurrency(employer, true)})</span>
+            </span>
+
+            <span className="flex items-center gap-1.5 text-red-700 font-bold">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-400" />
+              <span>Uncovered Gap ({formatIndianCurrency(gap, true)})</span>
+            </span>
           </div>
         </div>
 
-        {/* Coverage Breakdown Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-          <div className="rounded-xl p-4 bg-emerald-50 border border-emerald-200 space-y-1">
-            <div className="flex items-center gap-2">
-              <User className="w-4 h-4 text-emerald-600" />
-              <span className="text-[10px] font-bold text-emerald-700 uppercase">Individual Term</span>
-            </div>
-            <p className="text-xl font-black text-emerald-700">{formatIndianCurrency(individual, true)}</p>
-            <p className="text-[10px] text-emerald-600">Portable, stays with you</p>
+        {/* Compact Breakdown of Amounts */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+            <span className="text-[10px] uppercase font-bold text-brand-textSecondary">Individual Term</span>
+            <p className="text-base font-black text-brand-navy">{formatIndianCurrency(individual, true)}</p>
+            <p className="text-[10px] text-brand-textSecondary">Portable personal policy</p>
           </div>
 
-          <div className="rounded-xl p-4 bg-amber-50 border border-amber-200 space-y-1">
-            <div className="flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-amber-600" />
-              <span className="text-[10px] font-bold text-amber-700 uppercase">Employer Group</span>
-            </div>
-            <p className="text-xl font-black text-amber-700">{formatIndianCurrency(employer, true)}</p>
-            <p className="text-[10px] text-amber-600">Ends when you leave job</p>
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+            <span className="text-[10px] uppercase font-bold text-brand-textSecondary">Employer Cover</span>
+            <p className="text-base font-black text-brand-navy">{formatIndianCurrency(employer, true)}</p>
+            <p className="text-[10px] text-brand-textSecondary">Active only during employment</p>
           </div>
 
-          <div className={`rounded-xl p-4 space-y-1 ${gap > 0 ? 'bg-red-50 border border-red-200' : 'bg-blue-50 border border-blue-200'}`}>
-            <div className="flex items-center gap-2">
-              {gap > 0 ? <ShieldAlert className="w-4 h-4 text-red-600" /> : <ShieldCheck className="w-4 h-4 text-blue-600" />}
-              <span className={`text-[10px] font-bold uppercase ${gap > 0 ? 'text-red-700' : 'text-blue-700'}`}>
-                {gap > 0 ? 'Shortfall' : 'Surplus'}
-              </span>
-            </div>
-            <p className={`text-xl font-black ${gap > 0 ? 'text-red-700' : 'text-blue-700'}`}>
-              {formatIndianCurrency(gap, true)}
-            </p>
-            <p className={`text-[10px] ${gap > 0 ? 'text-red-600' : 'text-blue-600'}`}>
-              {gap > 0 ? 'Additional cover needed' : 'Coverage exceeds need'}
-            </p>
+          <div className="p-3.5 rounded-xl bg-red-50/60 border border-red-200 space-y-1">
+            <span className="text-[10px] uppercase font-bold text-red-600">Net Protection Gap</span>
+            <p className="text-base font-black text-red-700">{formatIndianCurrency(gap, true)}</p>
+            <p className="text-[10px] text-red-600">Additional safety net recommended</p>
           </div>
         </div>
+
+        {/* Portability Note if Employer Dependent */}
+        {isEmployerOnly && (
+          <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-start gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+            <p className="text-[11px] leading-relaxed">
+              <strong>Notice:</strong> Your current life coverage is entirely tied to your job. If you resign, change employers, or retire, coverage ends immediately.
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* Employer Dependency Warning */}
-      {isFullyEmployerDependent && (
-        <div className="bg-amber-50 rounded-2xl p-6 border border-amber-200 shadow-subtle flex gap-4">
-          <AlertTriangle className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" />
-          <div className="space-y-2">
-            <h3 className="text-sm font-bold text-amber-800">{t('employerWarningTitle')}</h3>
-            <p className="text-xs text-amber-700 leading-relaxed">{t('employerWarningDesc')}</p>
-            <div className="bg-white rounded-xl p-4 border border-amber-200 mt-3 space-y-2">
-              <h4 className="text-xs font-bold text-brand-navy">What happens if you lose employer cover?</h4>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="text-center p-3 rounded-lg bg-emerald-50">
-                  <p className="text-[10px] text-brand-textSecondary">Current Total Cover</p>
-                  <p className="text-sm font-bold text-emerald-700">{formatIndianCurrency(total, true)}</p>
-                </div>
-                <div className="text-center p-3 rounded-lg bg-red-50">
-                  <p className="text-[10px] text-brand-textSecondary">After Job Change</p>
-                  <p className="text-sm font-bold text-red-700">{formatIndianCurrency(individual, true)}</p>
-                </div>
-              </div>
-              <p className="text-[10px] text-amber-600 flex items-center gap-1">
-                <TrendingDown className="w-3 h-3" />
-                {formatIndianCurrency(employer, true)} coverage disappears instantly on resignation
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Privacy Note */}
-      <div className="flex gap-3 p-4 rounded-xl bg-slate-50 border border-slate-200">
-        <Lock className="w-4 h-4 text-brand-blue flex-shrink-0 mt-0.5" />
-        <p className="text-[10px] text-brand-textSecondary leading-relaxed">
-          LifeMap does not sell insurance, collect your PAN/Aadhaar, or share data with brokers. This analysis is purely educational.
-        </p>
-      </div>
-
-      {/* Actions */}
-      <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+      {/* Two Actions Only */}
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
         <Link
           to="/simulator"
-          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl text-sm font-extrabold text-brand-navyDark bg-gradient-to-r from-brand-tealLight to-brand-emerald hover:brightness-105 shadow-float transition-all"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3 rounded-xl text-xs font-bold text-white bg-brand-navy hover:bg-brand-navyLight shadow-subtle transition-all"
         >
-          Simulate Future Scenarios <ArrowRight className="w-4 h-4" />
+          <span>Explore Scenarios</span>
+          <ArrowRight className="w-4 h-4" />
         </Link>
         <Link
-          to="/calculator"
-          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl text-sm font-bold text-brand-navy bg-slate-100 hover:bg-slate-200 transition-all"
+          to="/assessment"
+          className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 rounded-xl text-xs font-semibold text-brand-navy border border-brand-border bg-white hover:bg-slate-50 transition-colors"
         >
-          Back to Calculator
+          Edit Plan
         </Link>
       </div>
+
+      {/* Concise Educational Disclaimer */}
+      <p className="text-[10px] text-center text-brand-textSecondary italic max-w-xl mx-auto">
+        Educational analysis based on user inputs. LifeMap does not solicit or sell insurance products.
+      </p>
     </div>
   );
 };

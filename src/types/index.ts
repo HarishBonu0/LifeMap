@@ -193,3 +193,144 @@ export interface InsuranceProductEducationalItem {
   lastVerifiedDate: string;
   sampleIllustrativePremiumRange: string;
 }
+
+// -------------------------------------------------------------
+// User-Scoped Backend & Mindset Assessment Types
+// -------------------------------------------------------------
+
+export interface MindsetQuestionOption {
+  text: string;
+  points: number; // e.g. 1 to 4
+  insight: string;
+}
+
+export interface MindsetQuestion {
+  id: string;
+  prompt: string;
+  category: 'risk_awareness' | 'debt_management' | 'family_protection' | 'inflation_horizon' | 'policy_literacy';
+  options: MindsetQuestionOption[];
+}
+
+export interface AssessmentSession {
+  id: string;
+  userId: string;
+  assessmentType: 'financial_mindset';
+  status: 'in_progress' | 'completed' | 'abandoned';
+  questionIds: string[];
+  currentQuestionIndex: number;
+  score?: number;
+  mindsetCategory?: 'Prudent Protector' | 'Disciplined Builder' | 'Aggressive Accumulator' | 'Vulnerable Starter';
+  summary?: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssessmentAnswer {
+  id: string;
+  sessionId: string;
+  userId: string;
+  questionId: string;
+  selectedOptionIndex: number;
+  pointsEarned: number;
+  answeredAt: string;
+}
+
+export interface ChatConversation {
+  id: string;
+  userId: string;
+  title: string;
+  language: Language;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatMessageRecord {
+  id: string;
+  conversationId: string;
+  userId: string;
+  sender: 'user' | 'assistant' | 'system';
+  content: string;
+  createdAt: string;
+}
+
+export interface GrowthScenarioRecord {
+  id: string;
+  userId: string;
+  scenarioName: string;
+  description?: string;
+  inputs: Record<string, any>;
+  results: Record<string, any>;
+  differenceAmount: number;
+  createdAt: string;
+}
+
+export type SchemeCategory = 'term' | 'endowment' | 'whole_life' | 'ulip';
+
+export interface InsuranceScheme {
+  id: string;
+  insurer: string;
+  name: string;
+  category: SchemeCategory;
+  categoryLabel: string;
+  policyPurpose: string;
+  entryAgeMin: number;
+  entryAgeMax: number;
+  maxMaturityAge: number;
+  premiumPaymentTerms: string;
+  policyTerm: string;
+  sumAssuredMin: number;
+  sumAssuredMax?: number;
+  sumAssuredText: string;
+  indicativeAnnualCost: string;
+  keyBenefits: string[];
+  majorExclusions: string[];
+  importantConditions: string[];
+  officialUrl: string;
+  isUlipOrMarketLinked: boolean;
+  isEndowmentOrSavings: boolean;
+  investmentVsInsuranceNotice: string;
+  isDemoSample: boolean;
+}
+
+export interface GrowthTrajectoryPoint {
+  year: number;
+  investedPrincipal: number;
+  conservativeNominal: number;
+  conservativeReal: number;
+  moderateNominal: number;
+  moderateReal: number;
+  aggressiveNominal: number;
+  aggressiveReal: number;
+  protectionNeed: number;
+}
+
+export interface GrowthProjectionResult {
+  inputs: {
+    initialSavings: number;
+    monthlyContribution: number;
+    annualInflation: number;
+    conservativeRate: number;
+    moderateRate: number;
+    aggressiveRate: number;
+  };
+  tenYear: {
+    investedPrincipal: number;
+    conservative: { nominal: number; real: number; earnings: number };
+    moderate: { nominal: number; real: number; earnings: number };
+    aggressive: { nominal: number; real: number; earnings: number };
+    protectionNeed: number;
+  };
+  twentyYear: {
+    investedPrincipal: number;
+    conservative: { nominal: number; real: number; earnings: number };
+    moderate: { nominal: number; real: number; earnings: number };
+    aggressive: { nominal: number; real: number; earnings: number };
+    protectionNeed: number;
+  };
+  trajectory: GrowthTrajectoryPoint[];
+  assumptions: {
+    notes: string[];
+    formulaSummary: string;
+  };
+}
+

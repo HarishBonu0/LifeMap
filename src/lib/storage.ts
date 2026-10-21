@@ -4,13 +4,11 @@ import {
   FinancialAssessmentInputs, 
   ScenarioSimulation, 
   UserLearningProgress, 
-  ChatMessage,
-  InsuranceNeedsResult 
+  ChatMessage
 } from '../types';
 import { DEMO_PROFILES, DemoProfilePackage } from '../data/demoProfiles';
-import { calculateInsuranceNeeds } from './calculator';
 
-const STORAGE_KEYS = {
+const BASE_KEYS = {
   CURRENT_USER: 'lifemap_user_profile',
   ASSESSMENT_INPUTS: 'lifemap_assessment_inputs',
   LIFE_GOALS: 'lifemap_life_goals',
@@ -19,15 +17,68 @@ const STORAGE_KEYS = {
   CHAT_MESSAGES: 'lifemap_chat_history',
 };
 
-// Initial default profile is Priya & Amit
+// In-memory fallback map for Node/test environments
+const memoryStorage = new Map<string, string>();
+
+const safeStorage = {
+  getItem(key: string): string | null {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        return window.localStorage.getItem(key);
+      }
+    } catch {}
+    return memoryStorage.get(key) || null;
+  },
+  setItem(key: string, value: string): void {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(key, value);
+        return;
+      }
+    } catch {}
+    memoryStorage.set(key, value);
+  },
+  removeItem(key: string): void {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.removeItem(key);
+        return;
+      }
+    } catch {}
+    memoryStorage.delete(key);
+  }
+};
+
+// Default profile for guest/demo mode
 const DEFAULT_PACKAGE: DemoProfilePackage = DEMO_PROFILES[0];
 
+let currentScopedUserId: string | null = null;
+
+const getKey = (baseKey: string): string => {
+  if (currentScopedUserId) {
+    return `${baseKey}_user_${currentScopedUserId}`;
+  }
+  return `${baseKey}_demo`;
+};
+
 export const StorageAdapter = {
+  setScopedUserId(userId: string | null) {
+    currentScopedUserId = userId;
+  },
+
+  getScopedUserId(): string | null {
+    return currentScopedUserId;
+  },
+
   // User Profile
   getUserProfile(): UserProfile {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+      const data = safeStorage.getItem(getKey(BASE_KEYS.CURRENT_USER));
       if (data) return JSON.parse(data);
+
+      // Legacy fallback
+      const legacy = safeStorage.getItem(BASE_KEYS.CURRENT_USER);
+      if (legacy && !currentScopedUserId) return JSON.parse(legacy);
     } catch (e) {
       console.warn('Failed to parse user profile from storage', e);
     }
@@ -35,14 +86,17 @@ export const StorageAdapter = {
   },
 
   setUserProfile(profile: UserProfile): void {
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(profile));
+    safeStorage.setItem(getKey(BASE_KEYS.CURRENT_USER), JSON.stringify(profile));
   },
 
   // Financial Assessment Inputs
   getAssessmentInputs(): FinancialAssessmentInputs {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.ASSESSMENT_INPUTS);
+      const data = safeStorage.getItem(getKey(BASE_KEYS.ASSESSMENT_INPUTS));
       if (data) return JSON.parse(data);
+
+      const legacy = safeStorage.getItem(BASE_KEYS.ASSESSMENT_INPUTS);
+      if (legacy && !currentScopedUserId) return JSON.parse(legacy);
     } catch (e) {
       console.warn('Failed to parse assessment inputs from storage', e);
     }
@@ -50,14 +104,17 @@ export const StorageAdapter = {
   },
 
   setAssessmentInputs(inputs: FinancialAssessmentInputs): void {
-    localStorage.setItem(STORAGE_KEYS.ASSESSMENT_INPUTS, JSON.stringify(inputs));
+    safeStorage.setItem(getKey(BASE_KEYS.ASSESSMENT_INPUTS), JSON.stringify(inputs));
   },
 
   // Life Goals
   getLifeGoals(): LifeGoal[] {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.LIFE_GOALS);
+      const data = safeStorage.getItem(getKey(BASE_KEYS.LIFE_GOALS));
       if (data) return JSON.parse(data);
+
+      const legacy = safeStorage.getItem(BASE_KEYS.LIFE_GOALS);
+      if (legacy && !currentScopedUserId) return JSON.parse(legacy);
     } catch (e) {
       console.warn('Failed to parse life goals from storage', e);
     }
@@ -65,7 +122,7 @@ export const StorageAdapter = {
   },
 
   setLifeGoals(goals: LifeGoal[]): void {
-    localStorage.setItem(STORAGE_KEYS.LIFE_GOALS, JSON.stringify(goals));
+    safeStorage.setItem(getKey(BASE_KEYS.LIFE_GOALS), JSON.stringify(goals));
   },
 
   addLifeGoal(goal: LifeGoal): LifeGoal[] {
@@ -85,7 +142,7 @@ export const StorageAdapter = {
   // Scenario Simulations
   getScenarios(): ScenarioSimulation[] {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.SCENARIOS);
+      const data = safeStorage.getItem(getKey(BASE_KEYS.SCENARIOS));
       if (data) return JSON.parse(data);
     } catch (e) {
       console.warn('Failed to parse scenarios from storage', e);
@@ -95,22 +152,21 @@ export const StorageAdapter = {
 
   saveScenario(scenario: ScenarioSimulation): void {
     const scenarios = this.getScenarios();
-    // Prepend new scenario, limit to last 10
     const updated = [scenario, ...scenarios.filter(s => s.id !== scenario.id)].slice(0, 10);
-    localStorage.setItem(STORAGE_KEYS.SCENARIOS, JSON.stringify(updated));
+    safeStorage.setItem(getKey(BASE_KEYS.SCENARIOS), JSON.stringify(updated));
   },
 
   // Learning Progress
   getLearningProgress(): UserLearningProgress[] {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.LEARNING_PROGRESS);
+      const data = safeStorage.getItem(getKey(BASE_KEYS.LEARNING_PROGRESS));
       if (data) return JSON.parse(data);
     } catch (e) {
       console.warn('Failed to parse learning progress from storage', e);
     }
     return [
       {
-        userId: 'demo-user',
+        userId: currentScopedUserId || 'demo-user',
         gameId: 'game-pure-term-vs-savings',
         attempts: 1,
         completed: true,
@@ -124,13 +180,13 @@ export const StorageAdapter = {
   saveLearningProgress(progress: UserLearningProgress): void {
     const all = this.getLearningProgress();
     const filtered = all.filter(p => p.gameId !== progress.gameId);
-    localStorage.setItem(STORAGE_KEYS.LEARNING_PROGRESS, JSON.stringify([...filtered, progress]));
+    safeStorage.setItem(getKey(BASE_KEYS.LEARNING_PROGRESS), JSON.stringify([...filtered, progress]));
   },
 
   // Chat History
   getChatHistory(): ChatMessage[] {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.CHAT_MESSAGES);
+      const data = safeStorage.getItem(getKey(BASE_KEYS.CHAT_MESSAGES));
       if (data) return JSON.parse(data);
     } catch (e) {
       console.warn('Failed to parse chat messages from storage', e);
@@ -139,7 +195,7 @@ export const StorageAdapter = {
   },
 
   saveChatHistory(messages: ChatMessage[]): void {
-    localStorage.setItem(STORAGE_KEYS.CHAT_MESSAGES, JSON.stringify(messages.slice(-30)));
+    safeStorage.setItem(getKey(BASE_KEYS.CHAT_MESSAGES), JSON.stringify(messages.slice(-30)));
   },
 
   // Load a full synthetic Demo Profile Package
@@ -153,11 +209,11 @@ export const StorageAdapter = {
 
   // Reset to default initial state
   resetAllToDefault(): void {
-    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
-    localStorage.removeItem(STORAGE_KEYS.ASSESSMENT_INPUTS);
-    localStorage.removeItem(STORAGE_KEYS.LIFE_GOALS);
-    localStorage.removeItem(STORAGE_KEYS.SCENARIOS);
-    localStorage.removeItem(STORAGE_KEYS.LEARNING_PROGRESS);
-    localStorage.removeItem(STORAGE_KEYS.CHAT_MESSAGES);
+    safeStorage.removeItem(getKey(BASE_KEYS.CURRENT_USER));
+    safeStorage.removeItem(getKey(BASE_KEYS.ASSESSMENT_INPUTS));
+    safeStorage.removeItem(getKey(BASE_KEYS.LIFE_GOALS));
+    safeStorage.removeItem(getKey(BASE_KEYS.SCENARIOS));
+    safeStorage.removeItem(getKey(BASE_KEYS.LEARNING_PROGRESS));
+    safeStorage.removeItem(getKey(BASE_KEYS.CHAT_MESSAGES));
   }
 };

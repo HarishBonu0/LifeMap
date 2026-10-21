@@ -7,7 +7,9 @@ import {
   InsuranceNeedsResult, 
   CalculationMode, 
   CalculationBreakdownItem,
-  CalculationAssumptions 
+  CalculationAssumptions,
+  GrowthProjectionResult,
+  GrowthTrajectoryPoint
 } from '../types';
 
 /**
@@ -343,5 +345,116 @@ export function compareScenarios(
     gapDelta,
     percentageNeedChange,
     keyInsights
+  };
+}
+
+/**
+ * Calculates 10-year and 20-year deterministic growth projections for Conservative, Moderate, and Aggressive scenarios,
+ * with nominal vs inflation-adjusted (real) values, formula transparency, and separate life insurance protection trajectory.
+ */
+export function calculateGrowthProjections(params: {
+  initialSavings: number;
+  monthlyContribution: number;
+  annualInflation?: number;
+  conservativeRate?: number;
+  moderateRate?: number;
+  aggressiveRate?: number;
+  baselineProtectionNeed?: number;
+  supportDurationYears?: number;
+}): GrowthProjectionResult {
+  const initial = Math.max(0, params.initialSavings || 0);
+  const monthly = Math.max(0, params.monthlyContribution || 0);
+  const inflation = typeof params.annualInflation === 'number' ? params.annualInflation : 0.06;
+  const rCons = typeof params.conservativeRate === 'number' ? params.conservativeRate : 0.065; // 6.5%
+  const rMod = typeof params.moderateRate === 'number' ? params.moderateRate : 0.10; // 10.0%
+  const rAgg = typeof params.aggressiveRate === 'number' ? params.aggressiveRate : 0.125; // 12.5%
+  const baseNeed = Math.max(0, params.baselineProtectionNeed || 0);
+  const totalYears = Math.max(5, params.supportDurationYears || 20);
+
+  // Compound initial lump sum + monthly SIP at annual rate r for t years
+  const calcFV = (r: number, t: number) => {
+    const lumpFV = initial * Math.pow(1 + r, t);
+    const monthlyRate = r / 12;
+    const months = t * 12;
+    let sipFV = 0;
+    if (monthlyRate > 0) {
+      sipFV = monthly * ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate) * (1 + monthlyRate);
+    } else {
+      sipFV = monthly * months;
+    }
+    const nominal = Math.round(lumpFV + sipFV);
+    const real = Math.round(nominal / Math.pow(1 + inflation, t));
+    const invested = Math.round(initial + monthly * months);
+    const earnings = Math.max(0, nominal - invested);
+    return { nominal, real, invested, earnings };
+  };
+
+  const calcNeedAtYear = (t: number) => {
+    if (t >= totalYears) return 0;
+    const remainingRatio = Math.max(0, (totalYears - t) / totalYears);
+    return Math.round(baseNeed * remainingRatio);
+  };
+
+  const trajectory: GrowthTrajectoryPoint[] = [];
+  for (let year = 1; year <= 20; year++) {
+    const c = calcFV(rCons, year);
+    const m = calcFV(rMod, year);
+    const a = calcFV(rAgg, year);
+    trajectory.push({
+      year,
+      investedPrincipal: c.invested,
+      conservativeNominal: c.nominal,
+      conservativeReal: c.real,
+      moderateNominal: m.nominal,
+      moderateReal: m.real,
+      aggressiveNominal: a.nominal,
+      aggressiveReal: a.real,
+      protectionNeed: calcNeedAtYear(year)
+    });
+  }
+
+  const c10 = calcFV(rCons, 10);
+  const m10 = calcFV(rMod, 10);
+  const a10 = calcFV(rAgg, 10);
+
+  const c20 = calcFV(rCons, 20);
+  const m20 = calcFV(rMod, 20);
+  const a20 = calcFV(rAgg, 20);
+
+  return {
+    inputs: {
+      initialSavings: initial,
+      monthlyContribution: monthly,
+      annualInflation: inflation,
+      conservativeRate: rCons,
+      moderateRate: rMod,
+      aggressiveRate: rAgg
+    },
+    tenYear: {
+      investedPrincipal: c10.invested,
+      conservative: { nominal: c10.nominal, real: c10.real, earnings: c10.earnings },
+      moderate: { nominal: m10.nominal, real: m10.real, earnings: m10.earnings },
+      aggressive: { nominal: a10.nominal, real: a10.real, earnings: a10.earnings },
+      protectionNeed: calcNeedAtYear(10)
+    },
+    twentyYear: {
+      investedPrincipal: c20.invested,
+      conservative: { nominal: c20.nominal, real: c20.real, earnings: c20.earnings },
+      moderate: { nominal: m20.nominal, real: m20.real, earnings: m20.earnings },
+      aggressive: { nominal: a20.nominal, real: a20.real, earnings: a20.earnings },
+      protectionNeed: calcNeedAtYear(20)
+    },
+    trajectory,
+    assumptions: {
+      notes: [
+        `Conservative scenario assumes ${(rCons * 100).toFixed(1)}% annual return (representative of fixed income, debt mutual funds, EPF, and sovereign bonds).`,
+        `Moderate scenario assumes ${(rMod * 100).toFixed(1)}% annual return (representative of balanced hybrid and large-cap equity index strategies).`,
+        `Higher-Growth scenario assumes ${(rAgg * 100).toFixed(1)}% annual return (representative of diversified equity mutual funds / SIP).`,
+        `Inflation adjustment assumes ${(inflation * 100).toFixed(1)}% annual cost-of-living rise (Real Purchasing Power = Nominal / (1 + inf)^t).`,
+        'Illustrative simulations do not guarantee actual future returns. Market-linked investments carry volatility and risk of capital loss.',
+        'Life insurance protection requirements are kept strictly independent of wealth accumulation to avoid underinsurance.'
+      ],
+      formulaSummary: 'FV_total = Initial × (1 + r)^t + SIP × [((1 + r/12)^(12t) - 1) / (r/12)] × (1 + r/12)'
+    }
   };
 }

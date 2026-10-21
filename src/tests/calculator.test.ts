@@ -4,7 +4,8 @@ import {
   formatIndianCurrency, 
   sanitizeFinancialInputs, 
   compareScenarios,
-  calculateFutureSupportExpensesPV 
+  calculateFutureSupportExpensesPV,
+  calculateGrowthProjections
 } from '../lib/calculator';
 import { FinancialAssessmentInputs } from '../types';
 
@@ -234,5 +235,51 @@ describe('LifeMap Financial Calculation Engine (Team AspireX)', () => {
     expect(formatIndianCurrency(45000, true)).toBe('₹45k');
     expect(formatIndianCurrency(0)).toBe('₹0');
     expect(formatIndianCurrency(-50000)).toBe('-₹50,000');
+  });
+
+  // 15. Deterministic 10-year and 20-year growth projections
+  it('15. calculates deterministic 10-year and 20-year growth projections with nominal and real values', () => {
+    const projection = calculateGrowthProjections({
+      initialSavings: 500000, // ₹5 Lakhs
+      monthlyContribution: 25000, // ₹25,000 / month
+      annualInflation: 0.06,
+      conservativeRate: 0.065,
+      moderateRate: 0.10,
+      aggressiveRate: 0.125,
+      baselineProtectionNeed: 15000000,
+      supportDurationYears: 20
+    });
+
+    expect(projection.tenYear.investedPrincipal).toBe(500000 + 25000 * 120); // ₹35 Lakhs
+    expect(projection.twentyYear.investedPrincipal).toBe(500000 + 25000 * 240); // ₹65 Lakhs
+
+    // Aggressive > Moderate > Conservative
+    expect(projection.tenYear.aggressive.nominal).toBeGreaterThan(projection.tenYear.moderate.nominal);
+    expect(projection.tenYear.moderate.nominal).toBeGreaterThan(projection.tenYear.conservative.nominal);
+
+    // Real values should be less than nominal due to 6% inflation
+    expect(projection.tenYear.moderate.real).toBeLessThan(projection.tenYear.moderate.nominal);
+    expect(projection.twentyYear.moderate.real).toBeLessThan(projection.twentyYear.moderate.nominal);
+
+    // Protection need at Year 20 should taper to 0 as support duration concludes
+    expect(projection.tenYear.protectionNeed).toBe(7500000);
+    expect(projection.twentyYear.protectionNeed).toBe(0);
+
+    // 20 data points in trajectory
+    expect(projection.trajectory.length).toBe(20);
+    expect(projection.trajectory[9].year).toBe(10);
+    expect(projection.trajectory[19].year).toBe(20);
+  });
+
+  // 16. Edge cases for zero savings/contribution
+  it('16. handles zero initial savings and zero monthly contributions gracefully', () => {
+    const projection = calculateGrowthProjections({
+      initialSavings: 0,
+      monthlyContribution: 0,
+      baselineProtectionNeed: 0
+    });
+    expect(projection.tenYear.investedPrincipal).toBe(0);
+    expect(projection.tenYear.moderate.nominal).toBe(0);
+    expect(projection.twentyYear.moderate.nominal).toBe(0);
   });
 });
