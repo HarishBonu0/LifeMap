@@ -95,12 +95,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signUp = async (email: string, password: string, name?: string, language: Language = 'en') => {
+    const normalizedEmail = (email || '').trim().toLowerCase();
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: normalizedEmail,
       password,
       options: {
         data: {
-          name: name || email.split('@')[0],
+          name: name ? name.trim() : normalizedEmail.split('@')[0],
           preferred_language: language
         }
       }
@@ -117,8 +118,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signIn = async (email: string, password: string) => {
+    const normalizedEmail = (email || '').trim().toLowerCase();
     const { data, error } = await supabase.auth.signInWithPassword({
-      email,
+      email: normalizedEmail,
       password
     });
 
@@ -133,7 +135,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch {}
     setUser(null);
     setProfile(null);
     setSession(null);

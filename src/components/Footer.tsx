@@ -1,53 +1,31 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { Logo } from './Logo';
 import { useTranslation } from '../i18n';
+import { ShieldAlert } from 'lucide-react';
 
+/**
+ * Global Footer removed per explicit specification.
+ * Renders null so no repeated footer appears across any page or layout.
+ */
 export const Footer: React.FC = () => {
+  return null;
+};
+
+/**
+ * Contextual educational and regulatory disclaimer to be embedded only
+ * at the bottom of calculation and planning results.
+ */
+export const ContextualDisclaimer: React.FC<{ className?: string }> = ({ className = '' }) => {
   const { t } = useTranslation();
 
   return (
-    <footer className="bg-white border-t border-brand-border py-8 text-brand-textSecondary text-xs">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Logo variant="compact" />
-            <span className="text-slate-300">|</span>
-            <span className="text-[11px] text-brand-textSecondary">
-              Independent life protection analysis & financial education.
-            </span>
-          </div>
-
-          {/* 4 Main Destinations */}
-          <nav className="flex items-center gap-4 text-xs font-semibold text-brand-navy" aria-label="Footer Navigation">
-            <Link to="/dashboard" className="hover:text-brand-teal transition-colors">
-              {t('navDashboard') || 'Dashboard'}
-            </Link>
-            <Link to="/assessment" className="hover:text-brand-teal transition-colors">
-              {t('navPlan') || 'Plan'}
-            </Link>
-            <Link to="/coverage" className="hover:text-brand-teal transition-colors">
-              {t('navCoverage') || 'Coverage'}
-            </Link>
-            <Link to="/games" className="hover:text-brand-teal transition-colors">
-              {t('navLearn') || 'Learn'}
-            </Link>
-          </nav>
-        </div>
-
-        {/* Regulatory & Educational Disclaimer */}
-        <div className="pt-4 border-t border-brand-border text-[11px] text-brand-textSecondary leading-relaxed">
-          <p>
-            <strong>Disclaimer:</strong> LifeMap is an educational planning platform. All calculations are deterministic estimates for informational guidance only and do not constitute insurance solicitation, financial advice, or an insurer's underwriting commitment.
-          </p>
-        </div>
-
-        {/* Bottom Attribution */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-400">
-          <span>© {new Date().getFullYear()} LifeMap • Team AspireX</span>
-          <span>English • తెలుగు • हिंदी</span>
-        </div>
+    <div className={`p-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] text-slate-500 flex items-start gap-3 leading-relaxed ${className}`}>
+      <ShieldAlert className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
+      <div>
+        <strong className="text-slate-700 block mb-0.5">{t('disclaimerHeading') || 'Educational Guidance Disclosure'}:</strong>
+        <p>
+          {t('disclaimerText') || 'LifeMap provides educational information and deterministic planning estimates based on the numbers and assumptions entered. All outputs are for informational guidance and do not constitute insurance solicitation, financial advice, or an insurer\'s underwriting commitment.'}
+        </p>
       </div>
-    </footer>
+    </div>
   );
 };

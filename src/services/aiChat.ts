@@ -14,42 +14,34 @@ export const aiChatService = {
     const { message, language, userInputs, calculationResult } = options;
     const lower = message.toLowerCase();
 
-    // Check if an external AI endpoint is configured
-    const apiKey = import.meta.env.VITE_AI_API_KEY;
-    const apiEndpoint = import.meta.env.VITE_AI_API_ENDPOINT;
+    // 1. Attempt server-side /api/chat endpoint where LLM keys remain strictly secure on the server
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message,
+          language,
+          context: {
+            inputs: userInputs,
+            calculation: calculationResult ? {
+              totalProtectionNeed: calculationResult.totalProtectionNeed,
+              coverageGap: calculationResult.coverageGap,
+              existingTotalCoverage: calculationResult.existingTotalCoverage
+            } : undefined
+          }
+        })
+      });
 
-    if (apiKey && apiEndpoint) {
-      try {
-        const response = await fetch(apiEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            prompt: message,
-            language,
-            context: {
-              inputs: userInputs,
-              calculation: calculationResult ? {
-                totalProtectionNeed: calculationResult.totalProtectionNeed,
-                coverageGap: calculationResult.coverageGap,
-                existingTotalCoverage: calculationResult.existingTotalCoverage
-              } : undefined
-            }
-          }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          if (data.reply) return data.reply;
-        }
-      } catch (err) {
-        console.warn('External AI endpoint failed, falling back to intelligent knowledge engine', err);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.reply) return data.reply;
       }
+    } catch {
+      // Graceful fallback to deterministic knowledge engine below
     }
 
-    // Intelligent context-aware localized response generator
+    // 2. Intelligent context-aware localized response generator
     return this.generateContextualResponse(lower, language, userInputs, calculationResult);
   },
 

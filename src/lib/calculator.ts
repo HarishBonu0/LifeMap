@@ -9,7 +9,12 @@ import {
   CalculationBreakdownItem,
   CalculationAssumptions,
   GrowthProjectionResult,
-  GrowthTrajectoryPoint
+  GrowthTrajectoryPoint,
+  DreamLifeGoal,
+  DreamLifeScenarioInputs,
+  DreamLifeScenarioSummary,
+  BusinessIdeaInputs,
+  BusinessIdeaResult
 } from '../types';
 
 /**
@@ -458,3 +463,327 @@ export function calculateGrowthProjections(params: {
     }
   };
 }
+
+/**
+ * Calculates future inflated cost of a goal:
+ * Future Cost = Current Cost * (1 + inflation rate)^years
+ */
+export function calculateFutureGoalCost(
+  currentCost: number,
+  years: number,
+  inflationRate: number = 0.06
+): number {
+  if (currentCost <= 0 || isNaN(currentCost)) return 0;
+  if (years <= 0 || isNaN(years)) return Math.round(currentCost);
+  const rate = Math.max(0, Math.min(0.25, inflationRate));
+  return Math.round(currentCost * Math.pow(1 + rate, years));
+}
+
+/**
+ * Calculates the required monthly contribution (SIP) to reach a target future sum
+ * over a given number of years at an expected annual return rate, taking into account
+ * any initial dedicated savings, handling zero-return and edge cases explicitly.
+ */
+export function calculateRequiredMonthlyContribution(
+  targetFutureCost: number,
+  years: number,
+  annualReturnRate: number = 0.10,
+  currentDedicatedSavings: number = 0
+): number {
+  if (targetFutureCost <= 0 || isNaN(targetFutureCost)) return 0;
+  if (years <= 0 || isNaN(years)) return Math.round(targetFutureCost);
+
+  const months = Math.round(years * 12);
+  if (months <= 0) return Math.round(targetFutureCost);
+
+  const dedicated = Math.max(0, currentDedicatedSavings || 0);
+
+  // Zero-return scenario (e.g. cash hoard / 0% interest account)
+  if (Math.abs(annualReturnRate) < 0.0001) {
+    const netShortfall = Math.max(0, targetFutureCost - dedicated);
+    return Math.round(netShortfall / months);
+  }
+
+  // Future value of existing dedicated savings at maturity
+  const fvExisting = dedicated * Math.pow(1 + annualReturnRate, years);
+  const remainingNeeded = Math.max(0, targetFutureCost - fvExisting);
+
+  if (remainingNeeded <= 0) return 0;
+
+  // Monthly compounded rate
+  const monthlyRate = annualReturnRate / 12;
+  // SIP annuity formula with beginning-of-month payments:
+  // FV = P * [((1 + r)^n - 1) / r] * (1 + r)
+  const annuityFactor = ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate) * (1 + monthlyRate);
+  
+  if (annuityFactor <= 0) return Math.round(remainingNeeded / months);
+  return Math.round(remainingNeeded / annuityFactor);
+}
+
+/**
+ * Deterministically computes the 3 DreamLife AI Scenarios:
+ * 1. Current Path: Baseline income, expenses, and current saving capacity.
+ * 2. Growth Path: User tests alternative savings rate & progressive income growth.
+ * 3. Priority Path: Prioritizes Essential & High goals, postpones medium/flexible goals to fit realistic surplus.
+ */
+export function calculateDreamLifeScenarios(inputs: DreamLifeScenarioInputs): {
+  currentPath: DreamLifeScenarioSummary;
+  growthPath: DreamLifeScenarioSummary;
+  priorityPath: DreamLifeScenarioSummary;
+} {
+  const inflation = typeof inputs.inflationRate === 'number' ? Math.max(0, inputs.inflationRate) : 0.06;
+  const returnRate = typeof inputs.nominalReturnRate === 'number' ? inputs.nominalReturnRate : 0.10;
+  const monthlyIncome = Math.max(0, inputs.monthlyIncome || 0);
+  const monthlyExpenses = Math.max(0, inputs.monthlyExpenses || 0);
+  const currentSurplus = Math.max(0, monthlyIncome - monthlyExpenses);
+
+  // Prevent double-counting: preserve emergency fund (6 months of living expenses)
+  const emergencyFundPreserved = monthlyExpenses * 6;
+  const liquidSavingsAvailable = Math.max(0, (inputs.liquidSavings || 0) - emergencyFundPreserved);
+
+  // Calculate future cost for each goal
+  const goalsWithFuture = inputs.goals.map(g => {
+    const futureCost = calculateFutureGoalCost(g.currentEstimatedCost, g.targetYears, inflation);
+    return {
+      ...g,
+      futureInflatedCost: futureCost
+    };
+  });
+
+  const totalNominal = goalsWithFuture.reduce((sum, g) => sum + g.currentEstimatedCost, 0);
+  const totalFuture = goalsWithFuture.reduce((sum, g) => sum + g.futureInflatedCost, 0);
+
+  // Total required monthly contribution to fund all goals across their respective horizons
+  const totalRequiredMonthly = goalsWithFuture.reduce((sum, g) => {
+    return sum + calculateRequiredMonthlyContribution(g.futureInflatedCost, g.targetYears, returnRate, 0);
+  }, 0);
+
+  // Function to simulate corpus growth at rate r
+  const calcCorpus = (initial: number, monthlySip: number, years: number, r: number) => {
+    const months = years * 12;
+    const lumpFV = initial * Math.pow(1 + r, years);
+    const mRate = r / 12;
+    const sipFV = mRate > 0 
+      ? monthlySip * ((Math.pow(1 + mRate, months) - 1) / mRate) * (1 + mRate)
+      : monthlySip * months;
+    return Math.round(lumpFV + sipFV);
+  };
+
+  // 1. Current Path
+  const current10YrCorpus = calcCorpus(liquidSavingsAvailable, currentSurplus, 10, returnRate);
+  const current20YrCorpus = calcCorpus(liquidSavingsAvailable, currentSurplus, 20, returnRate);
+
+  const sortedCurrentGoals = [...goalsWithFuture].sort((a, b) => a.targetYears - b.targetYears);
+  const fundedCurrentIds: string[] = [];
+  const unfundedCurrentIds: string[] = [];
+
+  for (const g of sortedCurrentGoals) {
+    const projectedPoolAtYear = calcCorpus(liquidSavingsAvailable, currentSurplus, g.targetYears, returnRate);
+    if (projectedPoolAtYear >= g.futureInflatedCost) {
+      fundedCurrentIds.push(g.id);
+    } else {
+      unfundedCurrentIds.push(g.id);
+    }
+  }
+
+  const currentShortfallMonthly = Math.max(0, totalRequiredMonthly - currentSurplus);
+  const currentTotalShortfall = Math.max(0, totalFuture - current10YrCorpus);
+
+  const currentPath: DreamLifeScenarioSummary = {
+    id: 'current_path',
+    title: 'Current Path',
+    tagline: 'Status Quo: Continuing at current income, spending, and saving habits.',
+    monthlySurplus: currentSurplus,
+    targetMonthlyContribution: totalRequiredMonthly,
+    shortfallPerMonth: currentShortfallMonthly,
+    totalGoalCostNominal: totalNominal,
+    totalGoalCostFuture: totalFuture,
+    projectedCorpus10Yr: current10YrCorpus,
+    projectedCorpus20Yr: current20YrCorpus,
+    fundedGoalsCount: fundedCurrentIds.length,
+    totalGoalsCount: goalsWithFuture.length,
+    potentialShortfall: currentTotalShortfall,
+    timelineHighlights: [
+      `Current monthly investable surplus: ${formatIndianCurrency(currentSurplus)}`,
+      `Target monthly allocation needed to fulfill all goals: ${formatIndianCurrency(totalRequiredMonthly)}`,
+      currentShortfallMonthly > 0
+        ? `Monthly gap of ${formatIndianCurrency(currentShortfallMonthly)} requires prioritizing or extending timelines.`
+        : 'Current surplus is sufficient to fund your stated goals!'
+    ],
+    assumptions: [
+      `Assumes current monthly savings of ${formatIndianCurrency(currentSurplus)} continues steadily.`,
+      `Preserves 6 months of living expenses (${formatIndianCurrency(emergencyFundPreserved)}) strictly for family emergency security.`,
+      `Illustrative annual compounded portfolio return of ${(returnRate * 100).toFixed(1)}%.`,
+      `Assumes annual inflation of ${(inflation * 100).toFixed(1)}% across goal costs.`
+    ],
+    fundedGoalIds: fundedCurrentIds,
+    unfundedGoalIds: unfundedCurrentIds
+  };
+
+  // 2. Growth Path
+  const incomeGrowthPct = inputs.growthIncomeGrowthRatePct || 0.10;
+  const boostedIncome = monthlyIncome * (1 + incomeGrowthPct);
+  const optimizedExpenses = monthlyExpenses * 0.92; // 8% discretionary expense control
+  const growthSurplus = Math.round(boostedIncome - optimizedExpenses);
+
+  const growth10YrCorpus = calcCorpus(liquidSavingsAvailable, growthSurplus, 10, returnRate + 0.015);
+  const growth20YrCorpus = calcCorpus(liquidSavingsAvailable, growthSurplus, 20, returnRate + 0.015);
+
+  const fundedGrowthIds: string[] = [];
+  const unfundedGrowthIds: string[] = [];
+  for (const g of sortedCurrentGoals) {
+    const projectedPoolAtYear = calcCorpus(liquidSavingsAvailable, growthSurplus, g.targetYears, returnRate + 0.015);
+    if (projectedPoolAtYear >= g.futureInflatedCost) {
+      fundedGrowthIds.push(g.id);
+    } else {
+      unfundedGrowthIds.push(g.id);
+    }
+  }
+
+  const growthPath: DreamLifeScenarioSummary = {
+    id: 'growth_path',
+    title: 'Growth Path',
+    tagline: 'Upskill & Optimize: 10% career income growth with disciplined 8% discretionary expense control.',
+    monthlySurplus: growthSurplus,
+    targetMonthlyContribution: totalRequiredMonthly,
+    shortfallPerMonth: Math.max(0, totalRequiredMonthly - growthSurplus),
+    totalGoalCostNominal: totalNominal,
+    totalGoalCostFuture: totalFuture,
+    projectedCorpus10Yr: growth10YrCorpus,
+    projectedCorpus20Yr: growth20YrCorpus,
+    fundedGoalsCount: fundedGrowthIds.length,
+    totalGoalsCount: goalsWithFuture.length,
+    potentialShortfall: Math.max(0, totalFuture - growth10YrCorpus),
+    timelineHighlights: [
+      `Accelerated monthly investable surplus: ${formatIndianCurrency(growthSurplus)} (+${formatIndianCurrency(growthSurplus - currentSurplus)})`,
+      `10-Year Projected Wealth Corpus: ${formatIndianCurrency(growth10YrCorpus, true)}`,
+      `Funds ${fundedGrowthIds.length} of ${goalsWithFuture.length} dream goals ahead of schedule.`
+    ],
+    assumptions: [
+      `Hypothesizes a 10% increase in household earnings through career progression or professional upskilling.`,
+      `Trims discretionary lifestyle spending by 8% to redeploy directly into milestone investments.`,
+      `Assumes a diversified equity mutual fund allocation earning an illustrative ${( (returnRate + 0.015) * 100).toFixed(1)}% annual CAGR.`,
+      `Past market performance is illustrative and not guaranteed.`
+    ],
+    fundedGoalIds: fundedGrowthIds,
+    unfundedGoalIds: unfundedGrowthIds
+  };
+
+  // 3. Priority Path
+  const postponeYears = inputs.priorityPostponeYears || 4;
+  const prioritizedGoals = goalsWithFuture.map(g => {
+    if (g.priority === 'flexible' || g.priority === 'medium') {
+      const extendedYears = g.targetYears + postponeYears;
+      return {
+        ...g,
+        targetYears: extendedYears,
+        futureInflatedCost: calculateFutureGoalCost(g.currentEstimatedCost, extendedYears, inflation)
+      };
+    }
+    return g;
+  });
+
+  const priorityRequiredMonthly = prioritizedGoals.reduce((sum, g) => {
+    return sum + calculateRequiredMonthlyContribution(g.futureInflatedCost, g.targetYears, returnRate, 0);
+  }, 0);
+
+  const fundedPriorityIds: string[] = [];
+  const unfundedPriorityIds: string[] = [];
+  for (const g of prioritizedGoals) {
+    const projectedPoolAtYear = calcCorpus(liquidSavingsAvailable, currentSurplus, g.targetYears, returnRate);
+    if (projectedPoolAtYear >= g.futureInflatedCost) {
+      fundedPriorityIds.push(g.id);
+    } else {
+      unfundedPriorityIds.push(g.id);
+    }
+  }
+
+  const priorityPath: DreamLifeScenarioSummary = {
+    id: 'priority_path',
+    title: 'Priority Path',
+    tagline: 'Strategic Sequencing: Locks in essential family safety & education first; postpones lifestyle items by 3–4 years.',
+    monthlySurplus: currentSurplus,
+    targetMonthlyContribution: priorityRequiredMonthly,
+    shortfallPerMonth: Math.max(0, priorityRequiredMonthly - currentSurplus),
+    totalGoalCostNominal: totalNominal,
+    totalGoalCostFuture: prioritizedGoals.reduce((sum, g) => sum + g.futureInflatedCost, 0),
+    projectedCorpus10Yr: current10YrCorpus,
+    projectedCorpus20Yr: current20YrCorpus,
+    fundedGoalsCount: fundedPriorityIds.length,
+    totalGoalsCount: prioritizedGoals.length,
+    potentialShortfall: Math.max(0, prioritizedGoals.reduce((sum, g) => sum + g.futureInflatedCost, 0) - current10YrCorpus),
+    timelineHighlights: [
+      `Lowers immediate monthly funding requirement from ${formatIndianCurrency(totalRequiredMonthly)} down to ${formatIndianCurrency(priorityRequiredMonthly)}.`,
+      `Fully protects non-negotiable milestones (Emergency Fund, Debt Shield, Child Education).`,
+      `Postpones flexible upgrades (e.g. luxury vehicle or holiday) by ${postponeYears} years to eliminate acute financial strain.`
+    ],
+    assumptions: [
+      `Essential and High-priority goals are funded strictly on their original timelines.`,
+      `Medium and Flexible goals are postponed by ${postponeYears} years, allowing compounding to accumulate more corpus naturally.`,
+      `Requires no increase in debt and keeps family financial peace intact.`
+    ],
+    fundedGoalIds: fundedPriorityIds,
+    unfundedGoalIds: unfundedPriorityIds
+  };
+
+  return {
+    currentPath,
+    growthPath,
+    priorityPath
+  };
+}
+
+/**
+ * Calculates deterministic Business Idea feasibility metrics:
+ * Startup capital, gross profit, net cash flow, break-even timeline, and risk analysis.
+ */
+export function calculateBusinessIdeaScenarios(inputs: BusinessIdeaInputs): BusinessIdeaResult {
+  const capital = Math.max(0, inputs.startupCapital || 0);
+  const opex = Math.max(0, inputs.monthlyOperatingCosts || 0);
+  const revenue = Math.max(0, inputs.monthlyRevenue || 0);
+  const marginPct = Math.max(0, Math.min(100, inputs.profitMarginPct || 0));
+
+  const grossProfit = Math.round(revenue * (marginPct / 100));
+  const netCashFlow = grossProfit - opex;
+  const isPositive = netCashFlow > 0;
+
+  const breakEven = isPositive && capital > 0 ? Math.ceil(capital / netCashFlow) : null;
+  const runway = capital + opex * 6; // recommended 6-month buffer
+
+  const calcScenario = (revMultiplier: number, opexMultiplier: number) => {
+    const sRev = Math.round(revenue * revMultiplier);
+    const sOpex = Math.round(opex * opexMultiplier);
+    const sGross = Math.round(sRev * (marginPct / 100));
+    const sNet = sGross - sOpex;
+    const sBreakEven = sNet > 0 && capital > 0 ? Math.ceil(capital / sNet) : null;
+    return { revenue: sRev, netCashFlow: sNet, breakEvenMonths: sBreakEven };
+  };
+
+  return {
+    ideaTitle: inputs.ideaTitle || 'New Venture Proposal',
+    startupCapital: capital,
+    monthlyOperatingCosts: opex,
+    monthlyRevenue: revenue,
+    profitMarginPct: marginPct,
+    monthlyGrossProfit: grossProfit,
+    monthlyNetCashFlow: netCashFlow,
+    breakEvenMonths: breakEven,
+    cashFlowRunwayRecommended: runway,
+    isCashFlowPositive: isPositive,
+    scenarios: {
+      conservative: calcScenario(0.8, 1.05), // -20% revenue, +5% opex
+      base: calcScenario(1.0, 1.0),
+      optimistic: calcScenario(1.2, 1.0) // +20% revenue
+    },
+    risksAndMitigations: [
+      'Revenue is not profit: Operating expenses, customer acquisition costs, and taxes must be settled before cash is realized.',
+      `Working Capital Buffer: Maintain at least ${formatIndianCurrency(opex * 6)} (6 months of operational expenses) in liquid reserves to survive initial payment delays.`,
+      'Do not stake family emergency reserves or term insurance cover as startup collateral.',
+      breakEven 
+        ? `Estimated capital recovery period is ${breakEven} months under base assumptions, provided steady operating margins are maintained.`
+        : 'Under current projections, monthly cash flow is zero or negative. Reduce monthly operating overhead or refine pricing structure before deploying capital.'
+    ],
+    disclaimer: 'Illustrative educational modeling only. Business performance depends on product-market fit, client contracts, and macroeconomic factors. LifeMap does not provide commercial underwriting or venture capital advisory.'
+  };
+}
+

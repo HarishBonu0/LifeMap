@@ -17,8 +17,8 @@ import { Language } from '../../types';
 import { Logo } from '../../components/Logo';
 
 export const SignUpPage: React.FC = () => {
-  const { signUp } = useAuth();
-  const { language, setLanguage } = useTranslation();
+  const { user, signUp } = useAuth();
+  const { t, language, setLanguage } = useTranslation();
   const navigate = useNavigate();
 
   const [fullName, setFullName] = useState('');
@@ -31,39 +31,48 @@ export const SignUpPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  React.useEffect(() => {
+    if (user) {
+      navigate('/overview', { replace: true });
+    }
+  }, [user, navigate]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    if (!fullName.trim() || !email.trim() || !password) {
-      setErrorMessage('Please fill in all required fields.');
+    const cleanName = fullName.trim();
+    const cleanEmail = email.trim();
+
+    if (!cleanName || !cleanEmail || !password) {
+      setErrorMessage(t('fillRequiredFields'));
       return;
     }
 
     if (password.length < 6) {
-      setErrorMessage('Password must be at least 6 characters.');
+      setErrorMessage(t('passwordMinLength'));
       return;
     }
 
     if (password !== confirmPassword) {
-      setErrorMessage('Passwords do not match. Please re-enter.');
+      setErrorMessage(t('passwordsDoNotMatch'));
       return;
     }
 
     setLoading(true);
     try {
-      const { error } = await signUp(email.trim(), password, fullName.trim(), selectedLang);
+      const { error } = await signUp(cleanEmail, password, cleanName, selectedLang);
       if (error) {
-        setErrorMessage(error.message || 'Failed to create account.');
+        setErrorMessage(error.message || t('networkError'));
       } else {
         setLanguage(selectedLang);
         setSuccess(true);
         setTimeout(() => {
           navigate('/overview', { replace: true });
-        }, 1200);
+        }, 800);
       }
     } catch {
-      setErrorMessage('Sign up failed. Please check your network connection.');
+      setErrorMessage(t('networkError'));
     } finally {
       setLoading(false);
     }
@@ -78,10 +87,10 @@ export const SignUpPage: React.FC = () => {
             <Logo variant="compact" />
           </Link>
           <h1 className="text-xl sm:text-2xl font-black text-brand-navy pt-2">
-            Create Your Account
+            {t('signUpTitle')}
           </h1>
           <p className="text-xs text-brand-textSecondary">
-            Independent life insurance and wealth planning for you and your family.
+            {t('signUpSub')}
           </p>
         </div>
 
@@ -96,21 +105,21 @@ export const SignUpPage: React.FC = () => {
         {success && (
           <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-700 flex items-start gap-2.5">
             <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-            <span>Account created successfully! Opening your dashboard...</span>
+            <span>{t('accountCreatedSuccess')}</span>
           </div>
         )}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-brand-navy">Full Name</label>
+            <label className="block text-xs font-bold text-brand-navy">{t('fullNameLabel')}</label>
             <div className="relative">
               <User className="w-4 h-4 text-brand-textSecondary absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="e.g. Priya Sharma"
+                placeholder={t('fullNamePlaceholder')}
                 required
                 className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-brand-border bg-white text-xs font-semibold text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal"
               />
@@ -118,14 +127,14 @@ export const SignUpPage: React.FC = () => {
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-brand-navy">Email Address</label>
+            <label className="block text-xs font-bold text-brand-navy">{t('emailLabel')}</label>
             <div className="relative">
               <Mail className="w-4 h-4 text-brand-textSecondary absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@example.com"
+                placeholder={t('emailPlaceholder')}
                 required
                 className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-brand-border bg-white text-xs font-semibold text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal"
               />
@@ -133,14 +142,14 @@ export const SignUpPage: React.FC = () => {
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-brand-navy">Password</label>
+            <label className="block text-xs font-bold text-brand-navy">{t('passwordLabel')}</label>
             <div className="relative">
               <KeyRound className="w-4 h-4 text-brand-textSecondary absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Min 6 characters"
+                placeholder={t('passwordPlaceholder')}
                 required
                 minLength={6}
                 className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-brand-border bg-white text-xs font-semibold text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal"
@@ -157,14 +166,14 @@ export const SignUpPage: React.FC = () => {
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-brand-navy">Confirm Password</label>
+            <label className="block text-xs font-bold text-brand-navy">{t('confirmPasswordLabel')}</label>
             <div className="relative">
               <KeyRound className="w-4 h-4 text-brand-textSecondary absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Re-enter your password"
+                placeholder={t('passwordPlaceholder')}
                 required
                 minLength={6}
                 className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-brand-border bg-white text-xs font-semibold text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal"
@@ -173,7 +182,7 @@ export const SignUpPage: React.FC = () => {
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-brand-navy">Preferred Language</label>
+            <label className="block text-xs font-bold text-brand-navy">{t('preferredLanguageLabel')}</label>
             <div className="grid grid-cols-3 gap-2">
               {[
                 { code: 'en' as Language, label: 'English', short: 'English' },
@@ -205,7 +214,7 @@ export const SignUpPage: React.FC = () => {
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : (
               <>
-                <span>Create Free Account</span>
+                <span>{t('createFreeAccount')}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </>
             )}
@@ -214,9 +223,9 @@ export const SignUpPage: React.FC = () => {
 
         {/* Footer Link */}
         <div className="pt-2 text-center text-xs text-brand-textSecondary border-t border-brand-border">
-          <span>Already have an account? </span>
+          <span>{t('alreadyHaveAccount')} </span>
           <Link to="/signin" className="font-bold text-brand-teal hover:underline">
-            Sign In
+            {t('login')}
           </Link>
         </div>
       </div>

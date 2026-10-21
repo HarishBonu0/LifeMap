@@ -71,27 +71,27 @@ export const PrivateHeader: React.FC<PrivateHeaderProps> = ({ onMenuToggle }) =>
   const getPageInfo = () => {
     const path = location.pathname;
     if (path === '/dashboard' || path === '/overview') {
-      return { title: 'Overview', icon: LayoutDashboard, category: 'Dashboard' };
+      return { title: t('navOverview') || 'Overview', icon: LayoutDashboard, category: t('navDashboard') || 'Dashboard' };
     }
     if (path.startsWith('/schemes')) {
-      return { title: 'Insurance Schemes', icon: Shield, category: 'IRDAI Catalog' };
+      return { title: t('navSchemes') || 'Insurance Schemes', icon: Shield, category: 'IRDAI' };
     }
     if (path.startsWith('/plan') || path === '/coverage' || path === '/simulator' || path === '/calculator') {
-      return { title: 'My Plan', icon: ShieldCheck, category: 'Protection & Goals' };
+      return { title: t('navMyPlan') || 'My Plan', icon: ShieldCheck, category: t('tabProtection') || 'Protection' };
     }
     if (path.startsWith('/learning') || path === '/mindset' || path === '/games') {
-      return { title: 'Financial Learning', icon: Brain, category: 'Education & Mindset' };
+      return { title: t('navFinancialLearning') || 'Financial Learning', icon: Brain, category: t('navLearn') || 'Education' };
     }
     if (path.startsWith('/chat') || path === '/assistant') {
-      return { title: 'AI Assistant', icon: MessageSquare, category: 'Advisory Guide' };
+      return { title: t('navAIAssistant') || 'AI Assistant', icon: MessageSquare, category: 'AI Guide' };
     }
     if (path === '/profile') {
-      return { title: 'My Profile', icon: User, category: 'Account' };
+      return { title: t('myProfile') || 'My Profile', icon: User, category: t('personalDetails') || 'Account' };
     }
     if (path === '/settings') {
-      return { title: 'Settings & Privacy', icon: Settings, category: 'Preferences' };
+      return { title: t('settings') || 'Settings & Privacy', icon: Settings, category: t('settings') || 'Preferences' };
     }
-    return { title: 'Platform', icon: Sparkles, category: 'LifeMap' };
+    return { title: 'LifeMap', icon: Sparkles, category: 'LifeMap' };
   };
 
   const pageInfo = getPageInfo();
@@ -203,7 +203,7 @@ export const PrivateHeader: React.FC<PrivateHeaderProps> = ({ onMenuToggle }) =>
               <div className="absolute right-0 mt-2 w-56 bg-white text-brand-textPrimary rounded-2xl shadow-float border border-brand-border py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
                 {/* User Info Header */}
                 <div className="px-3.5 py-2.5 border-b border-brand-border">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Signed in as</span>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">{t('signedInAs') || 'Signed in as'}</span>
                   <p className="text-xs font-bold text-brand-navy truncate mt-0.5">{displayName}</p>
                   <p className="text-[11px] text-brand-textSecondary truncate">{displayEmail}</p>
                 </div>
@@ -216,7 +216,7 @@ export const PrivateHeader: React.FC<PrivateHeaderProps> = ({ onMenuToggle }) =>
                     className="w-full text-left px-3.5 py-2 text-xs font-semibold hover:bg-slate-50 flex items-center gap-2.5 text-brand-navy transition-colors"
                   >
                     <User className="w-4 h-4 text-brand-teal" />
-                    <span>My Profile</span>
+                    <span>{t('myProfile') || 'My Profile'}</span>
                   </Link>
 
                   <Link
@@ -225,7 +225,7 @@ export const PrivateHeader: React.FC<PrivateHeaderProps> = ({ onMenuToggle }) =>
                     className="w-full text-left px-3.5 py-2 text-xs font-semibold hover:bg-slate-50 flex items-center gap-2.5 text-brand-navy transition-colors"
                   >
                     <Settings className="w-4 h-4 text-brand-teal" />
-                    <span>Settings & Privacy</span>
+                    <span>{t('settings') || 'Settings & Privacy'}</span>
                   </Link>
                 </div>
 
@@ -233,10 +233,10 @@ export const PrivateHeader: React.FC<PrivateHeaderProps> = ({ onMenuToggle }) =>
                 <div className="pt-1 border-t border-brand-border">
                   <button
                     onClick={handleSignOut}
-                    className="w-full text-left px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 transition-colors"
+                    className="w-full text-left px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 transition-colors cursor-pointer"
                   >
                     <LogOut className="w-4 h-4 text-rose-500" />
-                    <span>Sign Out</span>
+                    <span>{t('logout') || 'Sign Out'}</span>
                   </button>
                 </div>
               </div>

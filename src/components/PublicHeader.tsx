@@ -6,7 +6,7 @@ import { useTranslation } from '../i18n';
 import { Language } from '../types';
 
 export const PublicHeader: React.FC = () => {
-  const { language, setLanguage } = useTranslation();
+  const { language, setLanguage, t } = useTranslation();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
@@ -18,9 +18,9 @@ export const PublicHeader: React.FC = () => {
   ];
 
   const navLinks = [
-    { to: '/#how-it-works', label: 'How It Works' },
-    { to: '/plans', label: 'Insurance Plans' },
-    { to: '/#about', label: 'About' },
+    { to: '/#how-it-works', label: t('howItWorks') || 'How It Works' },
+    { to: '/plans', label: t('insurancePlans') || 'Insurance Plans' },
+    { to: '/#about', label: t('about') || 'About' },
   ];
 
   return (
@@ -54,7 +54,7 @@ export const PublicHeader: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setLangDropdownOpen(!langDropdownOpen)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-brand-border bg-white hover:bg-slate-50 text-xs font-medium text-brand-navy transition-colors"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-brand-border bg-white hover:bg-slate-50 text-xs font-medium text-brand-navy transition-colors cursor-pointer"
                 title="Change Language"
                 aria-expanded={langDropdownOpen}
               >
@@ -72,7 +72,7 @@ export const PublicHeader: React.FC = () => {
                         setLanguage(l.code);
                         setLangDropdownOpen(false);
                       }}
-                      className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between hover:bg-slate-50 transition-colors ${
+                      className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer ${
                         language === l.code ? 'font-bold text-brand-teal bg-teal-50/50' : 'text-brand-navy'
                       }`}
                     >
@@ -89,7 +89,7 @@ export const PublicHeader: React.FC = () => {
               to="/signin"
               className="inline-flex items-center px-3.5 py-1.5 rounded-lg border border-brand-border text-xs font-semibold text-brand-navy hover:bg-slate-50 transition-colors"
             >
-              Sign In
+              {t('login') || 'Sign In'}
             </Link>
 
             {/* Get Started Primary Button */}
@@ -97,7 +97,7 @@ export const PublicHeader: React.FC = () => {
               to="/signup"
               className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-brand-navy hover:bg-brand-navyLight text-white text-xs font-bold shadow-subtle transition-all"
             >
-              <span>Get Started</span>
+              <span>{t('getStarted') || 'Get Started'}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
 
@@ -135,14 +135,14 @@ export const PublicHeader: React.FC = () => {
               onClick={() => setMobileMenuOpen(false)}
               className="w-full text-center py-2 rounded-xl text-xs font-semibold text-brand-navy border border-brand-border hover:bg-slate-50"
             >
-              Sign In
+              {t('login') || 'Sign In'}
             </Link>
             <Link
               to="/signup"
               onClick={() => setMobileMenuOpen(false)}
               className="w-full text-center py-2 rounded-xl text-xs font-bold text-white bg-brand-navy hover:bg-brand-navyLight"
             >
-              Get Started Free
+              {t('getStarted') || 'Get Started'}
             </Link>
           </div>
         </div>

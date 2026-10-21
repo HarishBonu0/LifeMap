@@ -22,10 +22,11 @@ import { ChatConversation, ChatMessage } from '../../types';
 import { chatService } from '../../services/chatService';
 import { calculateInsuranceNeeds, formatIndianCurrency, sanitizeFinancialInputs } from '../../lib/calculator';
 import { DEMO_PROFILES } from '../../data/demoProfiles';
+import { StorageAdapter } from '../../lib/storage';
 
 export const ChatPage: React.FC = () => {
   const { user } = useAuth();
-  const { language } = useTranslation();
+  const { language, t } = useTranslation();
 
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
@@ -36,12 +37,13 @@ export const ChatPage: React.FC = () => {
   const [editingConvId, setEditingConvId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [lastFailedMessage, setLastFailedMessage] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Load user context (assessment and protection gap) to provide to chatbot
   const userContext = React.useMemo(() => {
-    let inputs = DEMO_PROFILES[0].inputs;
+    let inputs = StorageAdapter.getAssessmentInputs() || DEMO_PROFILES[0].inputs;
     const stored = sessionStorage.getItem('lifemap_assessment');
     if (stored) {
       try {
@@ -58,7 +60,7 @@ export const ChatPage: React.FC = () => {
       coverageGap: result.coverageGap,
       outstandingHomeLoan: inputs.outstandingHomeLoan
     };
-  }, []);
+  }, [user]);
 
   // 1. Load Conversations
   useEffect(() => {
@@ -355,7 +357,24 @@ export const ChatPage: React.FC = () => {
           </div>
 
           {/* Bottom Message Input Box */}
-          <div className="p-3.5 border-t border-brand-border bg-white">
+          <div className="p-3.5 border-t border-brand-border bg-white space-y-2">
+            {lastFailedMessage && (
+              <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center justify-between">
+                <span>Failed to send message. Please check your connection.</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const toRetry = lastFailedMessage;
+                    setLastFailedMessage(null);
+                    handleSendMessage(toRetry);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-[11px] transition-colors cursor-pointer"
+                >
+                  {t('retryMessage') || 'Retry'}
+                </button>
+              </div>
+            )}
+
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -363,23 +382,29 @@ export const ChatPage: React.FC = () => {
               }}
               className="flex items-center gap-2"
             >
-              <input
-                type="text"
+              <textarea
+                rows={1}
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
-                placeholder="Ask about your protection gap, insurance schemes, or 20-year simulator..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                placeholder={t('typeMessage') || 'Ask about your protection gap, insurance schemes, or 20-year simulator...'}
                 disabled={loading}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-brand-border bg-white text-xs font-semibold text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal"
+                className="flex-1 px-4 py-2.5 rounded-xl border border-brand-border bg-white text-xs font-semibold text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal resize-none"
               />
               <button
                 type="submit"
                 disabled={!inputMessage.trim() || loading}
-                className="p-2.5 rounded-xl bg-brand-navy hover:bg-brand-navyLight disabled:opacity-40 text-white transition-colors"
+                className="p-2.5 rounded-xl bg-brand-navy hover:bg-brand-navyLight disabled:opacity-40 text-white transition-colors cursor-pointer flex-shrink-0"
               >
                 <Send className="w-4 h-4" />
               </button>
             </form>
-            <p className="text-[10px] text-center text-brand-textSecondary mt-1.5">
+            <p className="text-[10px] text-center text-brand-textSecondary mt-1">
               Educational assistant. Not a substitute for a licensed insurance agent or SEBI registered financial advisor.
             </p>
           </div>

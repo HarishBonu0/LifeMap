@@ -11,10 +11,12 @@ import {
   Lock 
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTranslation } from '../../i18n';
 import { Logo } from '../../components/Logo';
 
 export const SignInPage: React.FC = () => {
-  const { signIn, resetPassword } = useAuth();
+  const { user, signIn, resetPassword } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -31,25 +33,32 @@ export const SignInPage: React.FC = () => {
   // Preserve intended destination from router state
   const from = (location.state as any)?.from?.pathname || '/overview';
 
+  React.useEffect(() => {
+    if (user) {
+      navigate(from, { replace: true });
+    }
+  }, [user, navigate, from]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    if (!email || !password) {
-      setErrorMessage('Please enter both email and password.');
+    const cleanEmail = email.trim();
+    if (!cleanEmail || !password) {
+      setErrorMessage(t('enterBothEmailPassword') || 'Please enter both email and password.');
       return;
     }
 
     setLoading(true);
     try {
-      const { error } = await signIn(email, password);
+      const { error } = await signIn(cleanEmail, password);
       if (error) {
-        setErrorMessage(error.message || 'Invalid email or password.');
+        setErrorMessage(error.message || t('invalidCredentials') || 'Invalid email or password.');
       } else {
         navigate(from, { replace: true });
       }
     } catch {
-      setErrorMessage('Sign in request failed. Please check your network connection.');
+      setErrorMessage(t('networkError') || 'Sign in request failed. Please check your network connection.');
     } finally {
       setLoading(false);
     }
@@ -57,18 +66,19 @@ export const SignInPage: React.FC = () => {
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resetEmail) return;
+    const cleanResetEmail = resetEmail.trim();
+    if (!cleanResetEmail) return;
 
     setResetLoading(true);
     try {
-      const { error } = await resetPassword(resetEmail);
+      const { error } = await resetPassword(cleanResetEmail);
       if (error) {
         setErrorMessage(error.message || 'Could not send reset email.');
       } else {
         setResetSent(true);
       }
     } catch {
-      setErrorMessage('Password reset failed.');
+      setErrorMessage(t('networkError') || 'Password reset failed.');
     } finally {
       setResetLoading(false);
     }
@@ -83,10 +93,10 @@ export const SignInPage: React.FC = () => {
             <Logo variant="compact" />
           </Link>
           <h1 className="text-xl sm:text-2xl font-black text-brand-navy pt-2">
-            Sign In to LifeMap
+            {t('signInTitle') || 'Sign In to LifeMap'}
           </h1>
           <p className="text-xs text-brand-textSecondary">
-            Enter your credentials to access your private protection plan.
+            {t('signInSub') || 'Enter your credentials to access your private protection plan.'}
           </p>
         </div>
 
@@ -101,14 +111,14 @@ export const SignInPage: React.FC = () => {
         {/* Sign In Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-brand-navy">Email Address</label>
+            <label className="block text-xs font-bold text-brand-navy">{t('emailLabel') || 'Email Address'}</label>
             <div className="relative">
               <Mail className="w-4 h-4 text-brand-textSecondary absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@example.com"
+                placeholder={t('emailPlaceholder') || 'name@example.com'}
                 required
                 className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-brand-border bg-white text-xs font-semibold text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal"
               />
@@ -117,16 +127,16 @@ export const SignInPage: React.FC = () => {
 
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <label className="block text-xs font-bold text-brand-navy">Password</label>
+              <label className="block text-xs font-bold text-brand-navy">{t('passwordLabel') || 'Password'}</label>
               <button
                 type="button"
                 onClick={() => {
                   setShowResetModal(true);
                   setResetEmail(email);
                 }}
-                className="text-[11px] font-semibold text-brand-teal hover:underline"
+                className="text-[11px] font-semibold text-brand-teal hover:underline cursor-pointer"
               >
-                Forgot password?
+                {t('forgotPassword') || 'Forgot password?'}
               </button>
             </div>
             <div className="relative">
@@ -142,7 +152,7 @@ export const SignInPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-textSecondary hover:text-brand-navy"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-textSecondary hover:text-brand-navy cursor-pointer"
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -153,13 +163,13 @@ export const SignInPage: React.FC = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 rounded-xl text-xs font-bold text-white bg-brand-navy hover:bg-brand-navyLight shadow-subtle disabled:opacity-50 transition-all flex items-center justify-center gap-2 mt-2"
+            className="w-full py-3 rounded-xl text-xs font-bold text-white bg-brand-navy hover:bg-brand-navyLight shadow-subtle disabled:opacity-50 transition-all flex items-center justify-center gap-2 mt-2 cursor-pointer"
           >
             {loading ? (
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : (
               <>
-                <span>Sign In</span>
+                <span>{t('login') || 'Sign In'}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </>
             )}
@@ -168,9 +178,9 @@ export const SignInPage: React.FC = () => {
 
         {/* Footer Link */}
         <div className="pt-2 text-center text-xs text-brand-textSecondary border-t border-brand-border">
-          <span>Don't have an account? </span>
-          <Link to="/signup" className="font-bold text-brand-teal hover:underline">
-            Create Account
+          <span>{t('dontHaveAccount') || "Don't have an account?"} </span>
+          <Link to="/signup" className="font-bold text-brand-teal hover:underline ml-1">
+            {t('createFreeAccount') || 'Create Account'}
           </Link>
         </div>
       </div>
@@ -179,19 +189,19 @@ export const SignInPage: React.FC = () => {
       {showResetModal && (
         <div className="fixed inset-0 z-50 bg-brand-navy/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl border border-brand-border p-6 max-w-sm w-full space-y-4 shadow-float animate-in fade-in zoom-in-95 duration-150">
-            <h3 className="text-sm font-bold text-brand-navy">Reset Password</h3>
+            <h3 className="text-sm font-bold text-brand-navy">{t('resetPasswordTitle') || 'Reset Password'}</h3>
             {resetSent ? (
               <div className="space-y-3 text-center py-2">
                 <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
                 <p className="text-xs text-brand-textSecondary leading-relaxed">
-                  Password reset link has been sent to <strong>{resetEmail}</strong>. Please check your inbox.
+                  {t('resetSentSuccess') || 'Password reset link has been sent. Please check your inbox.'}
                 </p>
                 <button
                   onClick={() => {
                     setShowResetModal(false);
                     setResetSent(false);
                   }}
-                  className="w-full py-2 rounded-xl text-xs font-semibold text-white bg-brand-navy"
+                  className="w-full py-2 rounded-xl text-xs font-semibold text-white bg-brand-navy cursor-pointer"
                 >
                   Done
                 </button>
@@ -199,13 +209,13 @@ export const SignInPage: React.FC = () => {
             ) : (
               <form onSubmit={handleResetPassword} className="space-y-3">
                 <p className="text-xs text-brand-textSecondary">
-                  Enter your registered email to receive password reset instructions.
+                  {t('resetPasswordDesc') || 'Enter your registered email to receive password reset instructions.'}
                 </p>
                 <input
                   type="email"
                   value={resetEmail}
                   onChange={(e) => setResetEmail(e.target.value)}
-                  placeholder="name@example.com"
+                  placeholder={t('emailPlaceholder') || 'name@example.com'}
                   required
                   className="w-full px-3 py-2 rounded-xl border border-brand-border bg-white text-xs font-semibold text-brand-navy"
                 />
@@ -213,16 +223,16 @@ export const SignInPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setShowResetModal(false)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-brand-textSecondary hover:bg-slate-100"
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-brand-textSecondary hover:bg-slate-100 cursor-pointer"
                   >
-                    Cancel
+                    {t('cancel') || 'Cancel'}
                   </button>
                   <button
                     type="submit"
                     disabled={resetLoading}
-                    className="px-4 py-1.5 rounded-lg text-xs font-bold text-white bg-brand-navy"
+                    className="px-4 py-1.5 rounded-lg text-xs font-bold text-white bg-brand-navy cursor-pointer"
                   >
-                    {resetLoading ? 'Sending...' : 'Send Reset Link'}
+                    {resetLoading ? 'Sending...' : (t('sendResetLink') || 'Send Reset Link')}
                   </button>
                 </div>
               </form>

@@ -17,9 +17,11 @@ import {
 } from 'lucide-react';
 import { VERIFIED_INSURANCE_SCHEMES, SCHEME_CATEGORIES } from '../../data/schemesData';
 import { InsuranceScheme } from '../../types';
+import { useTranslation } from '../../i18n';
 
 export const PublicSchemesPage: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeDetailScheme, setActiveDetailScheme] = useState<InsuranceScheme | null>(null);
@@ -45,19 +47,28 @@ export const PublicSchemesPage: React.FC = () => {
     setLoginPromptOpen(true);
   };
 
+  const getCategoryLabel = (catId: string, fallback: string) => {
+    if (catId === 'all') return t('allCategories');
+    if (catId === 'term') return t('pureTermCategory');
+    if (catId === 'endowment') return t('endowmentCategory');
+    if (catId === 'whole_life') return t('wholeLifeCategory');
+    if (catId === 'ulip') return t('ulipCategory');
+    return fallback;
+  };
+
   return (
     <div className="space-y-8 py-4 max-w-6xl mx-auto">
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-brand-border pb-5">
         <div>
           <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-teal-50 text-brand-teal text-[10px] font-bold uppercase tracking-wider mb-1">
-            <Shield className="w-3 h-3" /> Public Catalog • Verified IRDAI Schemes
+            <Shield className="w-3 h-3" /> {t('irdaiCompliantCatalog')}
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-brand-navy">
-            Explore Verified Insurance Plans
+            {t('schemesCatalogTitle')}
           </h1>
           <p className="text-xs sm:text-sm text-brand-textSecondary mt-0.5">
-            Browse official Indian life insurance products. Sign in to save schemes and calculate personalized premium requirements.
+            {t('schemesCatalogSub')}
           </p>
         </div>
 
@@ -65,7 +76,7 @@ export const PublicSchemesPage: React.FC = () => {
           to="/signup"
           className="self-start sm:self-auto inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-brand-navy hover:bg-brand-navyLight shadow-subtle transition-all"
         >
-          <span>Get Started Free</span>
+          <span>{t('getStarted')}</span>
           <ChevronRight className="w-4 h-4" />
         </Link>
       </div>
@@ -75,11 +86,10 @@ export const PublicSchemesPage: React.FC = () => {
         <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
         <div className="space-y-1">
           <p className="font-bold text-amber-950">
-            Consumer Protection Notice: Insurance ≠ Investment
+            {t('consumerProtectionNotice')}
           </p>
           <p className="leading-relaxed text-[11px] text-amber-900">
-            Life insurance is designed to replace lost income and shield dependents from liabilities. 
-            <strong> Pure Term plans</strong> offer the highest cover at the lowest premium. Traditional savings/endowment plans and ULIPs blend small covers with conservative returns or market risk.
+            {t('consumerProtectionNoticeDesc')}
           </p>
         </div>
       </div>
@@ -96,7 +106,7 @@ export const PublicSchemesPage: React.FC = () => {
                 : 'bg-white text-brand-textSecondary border border-brand-border hover:bg-slate-50'
             }`}
           >
-            All Schemes ({VERIFIED_INSURANCE_SCHEMES.length})
+            {t('allCategories')} ({VERIFIED_INSURANCE_SCHEMES.length})
           </button>
           {SCHEME_CATEGORIES.map((cat) => (
             <button
@@ -108,7 +118,7 @@ export const PublicSchemesPage: React.FC = () => {
                   : 'bg-white text-brand-textSecondary border border-brand-border hover:bg-slate-50'
               }`}
             >
-              {cat.label}
+              {getCategoryLabel(cat.id, cat.label)}
             </button>
           ))}
         </div>
@@ -118,7 +128,7 @@ export const PublicSchemesPage: React.FC = () => {
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Search by insurer, plan name, or coverage benefit..."
+            placeholder={t('searchSchemesPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-brand-border bg-white text-xs text-brand-navy placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-teal/40"
@@ -179,15 +189,15 @@ export const PublicSchemesPage: React.FC = () => {
 
               <div className="p-3.5 rounded-xl bg-gradient-to-br from-slate-50 via-teal-50/20 to-blue-50/20 border border-slate-200/90 space-y-1.5 text-xs">
                 <div className="flex justify-between text-brand-navy">
-                  <span className="text-slate-500 font-medium">Indicative Premium:</span>
+                  <span className="text-slate-500 font-medium">{t('indicativeCost')}:</span>
                   <span className="font-extrabold text-teal-700">{scheme.indicativeAnnualCost}</span>
                 </div>
                 <div className="flex justify-between text-brand-navy">
-                  <span className="text-slate-500 font-medium">Sum Assured:</span>
+                  <span className="text-slate-500 font-medium">{t('sumAssured')}:</span>
                   <span className="font-bold">{scheme.sumAssuredText}</span>
                 </div>
                 <div className="flex justify-between text-brand-navy">
-                  <span className="text-slate-500 font-medium">Entry Age:</span>
+                  <span className="text-slate-500 font-medium">{t('entryAge')}:</span>
                   <span className="font-bold">{scheme.entryAgeMin} - {scheme.entryAgeMax} yrs</span>
                 </div>
               </div>
@@ -199,13 +209,13 @@ export const PublicSchemesPage: React.FC = () => {
                 className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-brand-navy border border-brand-border hover:bg-slate-50 transition-colors"
               >
                 <FileText className="w-3.5 h-3.5 text-brand-teal" />
-                <span>View Details</span>
+                <span>{t('viewDetails')}</span>
               </button>
 
               <button
                 onClick={() => handleRequiresAuth('compare schemes side-by-side')}
                 className="inline-flex items-center justify-center p-2 rounded-xl text-xs font-semibold text-slate-500 border border-brand-border hover:bg-slate-50 transition-colors"
-                title="Sign in to compare"
+                title={t('compare')}
               >
                 <Lock className="w-3.5 h-3.5" />
               </button>
@@ -235,12 +245,12 @@ export const PublicSchemesPage: React.FC = () => {
 
             <div className="space-y-4 text-xs text-brand-navy leading-relaxed">
               <div>
-                <h4 className="font-bold text-slate-400 uppercase text-[10px]">Purpose</h4>
+                <h4 className="font-bold text-slate-400 uppercase text-[10px]">{t('policyPurpose')}</h4>
                 <p className="text-brand-textSecondary mt-0.5">{activeDetailScheme.policyPurpose}</p>
               </div>
 
               <div>
-                <h4 className="font-bold text-slate-400 uppercase text-[10px]">Key Benefits</h4>
+                <h4 className="font-bold text-slate-400 uppercase text-[10px]">{t('keyBenefits')}</h4>
                 <ul className="list-disc pl-5 space-y-1 text-brand-textSecondary mt-1">
                   {activeDetailScheme.keyBenefits.map((b, idx) => (
                     <li key={idx}>{b}</li>
@@ -249,7 +259,7 @@ export const PublicSchemesPage: React.FC = () => {
               </div>
 
               <div>
-                <h4 className="font-bold text-slate-400 uppercase text-[10px]">Major Exclusions</h4>
+                <h4 className="font-bold text-slate-400 uppercase text-[10px]">{t('majorExclusions')}</h4>
                 <ul className="list-disc pl-5 space-y-1 text-brand-textSecondary mt-1">
                   {activeDetailScheme.majorExclusions.map((e, idx) => (
                     <li key={idx}>{e}</li>
@@ -258,7 +268,7 @@ export const PublicSchemesPage: React.FC = () => {
               </div>
 
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <span className="font-bold block text-slate-700">Official Insurer Link</span>
+                <span className="font-bold block text-slate-700">{t('officialSite')}</span>
                 <a
                   href={activeDetailScheme.officialUrl}
                   target="_blank"
@@ -276,7 +286,7 @@ export const PublicSchemesPage: React.FC = () => {
                 onClick={() => setActiveDetailScheme(null)}
                 className="px-4 py-2 rounded-xl text-xs font-semibold text-brand-textSecondary hover:bg-slate-100"
               >
-                Close
+                {t('close')}
               </button>
               <button
                 onClick={() => {
@@ -286,7 +296,7 @@ export const PublicSchemesPage: React.FC = () => {
                 className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold text-white bg-brand-navy hover:bg-brand-navyLight shadow-subtle"
               >
                 <Bookmark className="w-3.5 h-3.5" />
-                <span>Save to My Plan</span>
+                <span>{t('savePlan')}</span>
               </button>
             </div>
           </div>
@@ -302,9 +312,9 @@ export const PublicSchemesPage: React.FC = () => {
             </div>
 
             <div className="space-y-1">
-              <h3 className="text-base font-bold text-brand-navy">Sign In Required</h3>
+              <h3 className="text-base font-bold text-brand-navy">{t('login')}</h3>
               <p className="text-xs text-brand-textSecondary leading-relaxed">
-                Please sign in to {loginPromptReason}. Creating an account is completely free.
+                {loginPromptReason}
               </p>
             </div>
 
@@ -314,13 +324,13 @@ export const PublicSchemesPage: React.FC = () => {
                 className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-brand-navy hover:bg-brand-navyLight shadow-subtle transition-all"
               >
                 <LogIn className="w-3.5 h-3.5" />
-                <span>Sign In</span>
+                <span>{t('login')}</span>
               </Link>
               <Link
                 to="/signup"
                 className="w-full inline-flex items-center justify-center gap-1 px-4 py-2 rounded-xl text-xs font-semibold text-brand-navy border border-brand-border hover:bg-slate-50 transition-colors"
               >
-                <span>Create New Account</span>
+                <span>{t('register')}</span>
               </Link>
             </div>
 
@@ -328,7 +338,7 @@ export const PublicSchemesPage: React.FC = () => {
               onClick={() => setLoginPromptOpen(false)}
               className="text-[11px] text-slate-400 hover:text-brand-navy transition-colors pt-1"
             >
-              Continue Browsing
+              {t('close')}
             </button>
           </div>
         </div>

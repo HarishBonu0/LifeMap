@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { ChatMessage, ChatConversation, Language } from '../types';
 import { StorageAdapter } from '../lib/storage';
+import { aiChatService } from './aiChat';
 
 export const chatService = {
   // Get all conversations for a user
@@ -180,12 +181,17 @@ export const chatService = {
         reply = json.reply;
       }
     } catch {
-      // Fallback
-      reply = language === 'te'
-        ? 'లైఫ్‌మ్యాప్: మీ రక్షణ లోటును పూడ్చడానికి తక్కువ ప్రీమియంతో కూడిన ప్యూర్ టర్మ్ ప్లాన్ తీసుకోవడం ఉత్తమం.'
-        : language === 'hi'
-        ? 'लाइफमैप: अपनी वित्तीय सुरक्षा के लिए शुद्ध टर्म इंश्योरेंस सबसे सुरक्षित और किफायती विकल्प है।'
-        : 'Pure term insurance is the most cost-effective way to secure your family against income interruption, keeping protection separate from investments.';
+      // Server-side endpoint unavailable or offline; fall through to intelligent engine
+    }
+
+    // If server LLM didn't return a reply, generate rich contextual localized response
+    if (!reply) {
+      reply = aiChatService.generateContextualResponse(
+        message.toLowerCase(),
+        language,
+        context?.inputs,
+        context?.calculation
+      );
     }
 
     // 3. Record assistant message

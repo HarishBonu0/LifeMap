@@ -47,7 +47,15 @@ export const DashboardPage: React.FC = () => {
       } catch {}
     }
 
-    // Default baseline inputs for user
+    const adapterInputs = StorageAdapter.getAssessmentInputs();
+    if (adapterInputs) {
+      const sanitized = sanitizeFinancialInputs(adapterInputs);
+      setInputs(sanitized);
+      setResult(calculateInsuranceNeeds(sanitized));
+      return;
+    }
+
+    // Default baseline inputs fallback
     const defaultInputs: FinancialAssessmentInputs = {
       age: 32,
       employmentType: 'salaried',
@@ -99,19 +107,19 @@ export const DashboardPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-brand-border pb-5">
         <div>
           <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-teal-50 text-brand-teal text-[10px] font-bold uppercase tracking-wider mb-1">
-            <Sparkles className="w-3 h-3 text-brand-amber" /> Overview
+            <Sparkles className="w-3 h-3 text-brand-amber" /> {t('navOverview') || 'Overview'}
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-brand-navy">
-            Welcome, {displayName}
+            {t('welcome') || 'Welcome'}, {displayName}
           </h1>
           <p className="text-xs sm:text-sm text-brand-textSecondary mt-0.5">
             {result.coverageGap > 0 ? (
               <span className="text-red-700 font-medium">
-                Action Recommended: Uncovered protection gap of <strong>{formatIndianCurrency(result.coverageGap, true)}</strong>. Review pure term life options.
+                {t('actionRecommended') || 'Action Recommended'}: {t('uncoveredShortfall') || 'Uncovered protection gap of'} <strong>{formatIndianCurrency(result.coverageGap, true)}</strong>.
               </span>
             ) : (
               <span className="text-emerald-700 font-medium">
-                Protected: Your existing coverage meets your calculated family safety net needs.
+                {t('protectedBanner') || 'Protected: Your existing coverage meets your calculated family safety net needs.'}
               </span>
             )}
           </p>
@@ -121,7 +129,7 @@ export const DashboardPage: React.FC = () => {
           to="/plan"
           className="self-start sm:self-auto inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-brand-navy hover:bg-brand-navyLight shadow-subtle transition-all"
         >
-          <span>View My Plan</span>
+          <span>{t('viewMyPlan') || 'View My Plan'}</span>
           <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       </div>
@@ -131,7 +139,7 @@ export const DashboardPage: React.FC = () => {
         {/* 1. Protection Need (Navy to Indigo Gradient) */}
         <div className="bg-gradient-to-br from-[#0B2545] via-[#103058] to-[#1E3A8A] text-white rounded-2xl p-5 border-2 border-[#1E3A8A] shadow-md space-y-2">
           <span className="text-[10px] font-extrabold tracking-wider text-teal-300 uppercase block">
-            Protection Need
+            {t('protectionNeed') || 'Protection Need'}
           </span>
           <p className="text-2xl sm:text-3xl font-black text-white">
             {formatIndianCurrency(result.totalProtectionNeed, true)}
@@ -144,41 +152,41 @@ export const DashboardPage: React.FC = () => {
         {/* 2. Existing Coverage (Emerald Gradient) */}
         <div className="bg-gradient-to-br from-white via-emerald-50/30 to-teal-50/40 rounded-2xl p-5 border-2 border-emerald-200/90 shadow-xs space-y-2 hover:border-emerald-400 transition-all">
           <span className="text-[10px] font-extrabold tracking-wider text-emerald-800 uppercase block">
-            Existing Coverage
+            {t('existingCoverage') || 'Existing Coverage'}
           </span>
           <p className="text-2xl sm:text-3xl font-black text-brand-navy">
             {formatIndianCurrency(result.existingTotalCoverage, true)}
           </p>
           <div className="flex items-center gap-3 text-[11px] text-brand-textSecondary">
-            <span>Own: <strong className="text-emerald-700">{formatIndianCurrency(result.existingIndividualCoverage, true)}</strong></span>
+            <span>{t('ownCover') || 'Own'}: <strong className="text-emerald-700">{formatIndianCurrency(result.existingIndividualCoverage, true)}</strong></span>
             <span>•</span>
-            <span>Emp: <strong className="text-blue-700">{formatIndianCurrency(result.existingEmployerCoverage, true)}</strong></span>
+            <span>{t('empCover') || 'Emp'}: <strong className="text-blue-700">{formatIndianCurrency(result.existingEmployerCoverage, true)}</strong></span>
           </div>
         </div>
 
         {/* 3. Coverage Gap (Rose/Red Alert Gradient) */}
         <div className="bg-gradient-to-br from-white via-rose-50/50 to-red-50/60 rounded-2xl p-5 border-2 border-rose-300/90 shadow-xs space-y-2 hover:border-rose-400 transition-all">
           <span className="text-[10px] font-extrabold tracking-wider text-rose-700 uppercase block">
-            Coverage Gap
+            {t('coverageGap') || 'Coverage Gap'}
           </span>
           <p className="text-2xl sm:text-3xl font-black text-red-700">
             {formatIndianCurrency(result.coverageGap, true)}
           </p>
           <p className="text-[11px] text-red-600 font-semibold">
-            {result.coverageGap > 0 ? '⚠ Uncovered family shortfall' : '✓ Adequately protected'}
+            {result.coverageGap > 0 ? (t('uncoveredShortfall') || '⚠ Uncovered family shortfall') : (t('adequatelyProtected') || '✓ Adequately protected')}
           </p>
         </div>
 
         {/* 4. Family Responsibilities (Blue Gradient) */}
         <div className="bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/30 rounded-2xl p-5 border-2 border-blue-200/90 shadow-xs space-y-2 hover:border-blue-400 transition-all">
           <span className="text-[10px] font-extrabold tracking-wider text-blue-800 uppercase block">
-            Family Responsibilities
+            {t('familyResponsibilities') || 'Family Responsibilities'}
           </span>
           <p className="text-2xl sm:text-3xl font-black text-brand-navy">
             {formatIndianCurrency(result.grossResponsibilities, true)}
           </p>
           <p className="text-[11px] text-brand-textSecondary font-medium">
-            Living support + debt obligations
+            {t('livingSupportDebt') || 'Living support + debt obligations'}
           </p>
         </div>
       </div>
@@ -190,12 +198,12 @@ export const DashboardPage: React.FC = () => {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-brand-navy flex items-center gap-1.5">
-                <Brain className="w-4 h-4 text-brand-teal" /> Financial Mindset Profile
+                <Brain className="w-4 h-4 text-brand-teal" /> {t('financialMindsetProfile') || 'Financial Mindset Profile'}
               </span>
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
                 mindsetCategory ? 'bg-teal-50 text-brand-teal' : 'bg-amber-50 text-amber-800'
               }`}>
-                {mindsetCategory ? 'Completed' : 'Pending'}
+                {mindsetCategory ? (t('completed') || 'Completed') : (t('pending') || 'Pending')}
               </span>
             </div>
 
@@ -203,14 +211,14 @@ export const DashboardPage: React.FC = () => {
               <div className="space-y-2">
                 <h3 className="text-lg font-bold text-brand-navy">{mindsetCategory}</h3>
                 <p className="text-xs text-brand-textSecondary leading-relaxed">
-                  Your profile demonstrates structured financial discipline. Resilience score: <strong className="text-brand-navy">{mindsetScore}%</strong>.
+                  Your profile demonstrates structured financial discipline. {t('resilienceScore') || 'Resilience score'}: <strong className="text-brand-navy">{mindsetScore}%</strong>.
                 </p>
               </div>
             ) : (
               <div className="space-y-2">
-                <h3 className="text-sm font-bold text-brand-navy">Discover Your Protection Mindset</h3>
+                <h3 className="text-sm font-bold text-brand-navy">{t('discoverMindset') || 'Discover Your Protection Mindset'}</h3>
                 <p className="text-xs text-brand-textSecondary leading-relaxed">
-                  Take the randomized assessment to measure your family protection resilience, risk tolerance, and time horizon.
+                  {t('mindsetPromptSub') || 'Take the randomized assessment to measure your family protection resilience, risk tolerance, and time horizon.'}
                 </p>
               </div>
             )}
@@ -221,7 +229,7 @@ export const DashboardPage: React.FC = () => {
               to="/learning"
               className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-teal hover:text-brand-tealDark transition-colors"
             >
-              <span>{mindsetCategory ? 'Review Mindset & Games' : 'Take Mindset Assessment'}</span>
+              <span>{mindsetCategory ? (t('reviewMindsetGames') || 'Review Mindset & Games') : (t('takeMindsetAssessment') || 'Take Mindset Assessment')}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -232,10 +240,10 @@ export const DashboardPage: React.FC = () => {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-brand-navy flex items-center gap-1.5">
-                <TrendingUp className="w-4 h-4 text-brand-teal" /> 10- & 20-Year Growth Projections
+                <TrendingUp className="w-4 h-4 text-brand-teal" /> {t('tenTwentyYearOutlook') || '10- & 20-Year Growth Projections'}
               </span>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-brand-navy">
-                Moderate (10.0%)
+                {t('moderatePath') || 'Moderate (10.0%)'}
               </span>
             </div>
 
@@ -267,7 +275,7 @@ export const DashboardPage: React.FC = () => {
               to="/plan?tab=10year"
               className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-teal hover:text-brand-tealDark transition-colors"
             >
-              <span>Explore Wealth Outlook in My Plan</span>
+              <span>{t('exploreGrowthScenarios') || 'Explore Wealth Outlook in My Plan'}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -277,16 +285,16 @@ export const DashboardPage: React.FC = () => {
       {/* Financial Breakdown */}
       <div className="bg-white rounded-2xl p-5 sm:p-6 border border-brand-border shadow-subtle space-y-4">
         <h2 className="text-sm font-bold text-brand-navy">
-          Financial Protection Breakdown
+          {t('tabProtection') || 'Financial Protection Breakdown'}
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-3">
             {[
-              { label: 'Family Living Support', amount: result.futureFamilySupportTotal, color: 'bg-brand-teal' },
-              { label: 'Home Loan Principal', amount: inputs.outstandingHomeLoan, color: 'bg-blue-600' },
-              { label: 'Education & Milestones', amount: result.futureCommitmentsTotal, color: 'bg-amber-600' },
-              { label: 'Liquid Assets (Offset)', amount: -result.eligibleAssetsConsidered, color: 'bg-emerald-600' },
+              { label: t('stepPersonal') || 'Family Living Support', amount: result.futureFamilySupportTotal, color: 'bg-brand-teal' },
+              { label: t('homeLoan') || 'Home Loan Principal', amount: inputs.outstandingHomeLoan, color: 'bg-blue-600' },
+              { label: t('educationLabel') || 'Education & Milestones', amount: result.futureCommitmentsTotal, color: 'bg-amber-600' },
+              { label: t('savingsLabel') || 'Liquid Assets (Offset)', amount: -result.eligibleAssetsConsidered, color: 'bg-emerald-600' },
             ].filter(item => item.amount !== 0).map((item, idx) => {
               const isOffset = item.amount < 0;
               const absAmt = Math.abs(item.amount);
@@ -323,7 +331,7 @@ export const DashboardPage: React.FC = () => {
               to="/plan"
               className="text-xs font-bold text-brand-teal hover:underline inline-flex items-center gap-1 self-start"
             >
-              <span>View Full Calculations</span>
+              <span>{t('viewMyPlan') || 'View Full Calculations'}</span>
               <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
@@ -339,8 +347,8 @@ export const DashboardPage: React.FC = () => {
           <div className="w-9 h-9 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-transform">
             <Shield className="w-4 h-4" />
           </div>
-          <span className="text-xs font-bold text-brand-navy block">Insurance Schemes</span>
-          <span className="text-[10px] text-brand-textSecondary block">Browse & compare official plans</span>
+          <span className="text-xs font-bold text-brand-navy block">{t('navSchemes') || 'Insurance Schemes'}</span>
+          <span className="text-[10px] text-brand-textSecondary block">{t('browseSchemesSub') || 'Browse & compare official plans'}</span>
         </Link>
 
         <Link
@@ -350,8 +358,8 @@ export const DashboardPage: React.FC = () => {
           <div className="w-9 h-9 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-transform">
             <ShieldCheck className="w-4 h-4" />
           </div>
-          <span className="text-xs font-bold text-brand-navy block">My Plan</span>
-          <span className="text-[10px] text-brand-textSecondary block">Coverage gap & 10/20-yr projections</span>
+          <span className="text-xs font-bold text-brand-navy block">{t('navMyPlan') || 'My Plan'}</span>
+          <span className="text-[10px] text-brand-textSecondary block">{t('coverageGap') || 'Coverage gap'} & {t('tenTwentyYearOutlook') || 'projections'}</span>
         </Link>
 
         <Link
@@ -361,8 +369,8 @@ export const DashboardPage: React.FC = () => {
           <div className="w-9 h-9 rounded-xl bg-gradient-to-r from-purple-500 to-pink-600 flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-transform">
             <Brain className="w-4 h-4" />
           </div>
-          <span className="text-xs font-bold text-brand-navy block">Financial Learning</span>
-          <span className="text-[10px] text-brand-textSecondary block">Mindset assessment & challenges</span>
+          <span className="text-xs font-bold text-brand-navy block">{t('navFinancialLearning') || 'Financial Learning'}</span>
+          <span className="text-[10px] text-brand-textSecondary block">{t('discoverMindset') || 'Mindset assessment'} & {t('navGames') || 'challenges'}</span>
         </Link>
 
         <Link
@@ -372,8 +380,8 @@ export const DashboardPage: React.FC = () => {
           <div className="w-9 h-9 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-transform">
             <MessageSquare className="w-4 h-4" />
           </div>
-          <span className="text-xs font-bold text-brand-navy block">AI Assistant</span>
-          <span className="text-[10px] text-brand-textSecondary block">Context-aware advice & history</span>
+          <span className="text-xs font-bold text-brand-navy block">{t('navAIAssistant') || 'AI Assistant'}</span>
+          <span className="text-[10px] text-brand-textSecondary block">{t('askAiGuideSub') || 'Context-aware advice & history'}</span>
         </Link>
       </div>
     </div>

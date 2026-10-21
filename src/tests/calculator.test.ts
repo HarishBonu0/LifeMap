@@ -5,9 +5,13 @@ import {
   sanitizeFinancialInputs, 
   compareScenarios,
   calculateFutureSupportExpensesPV,
-  calculateGrowthProjections
+  calculateGrowthProjections,
+  calculateFutureGoalCost,
+  calculateRequiredMonthlyContribution,
+  calculateDreamLifeScenarios,
+  calculateBusinessIdeaScenarios
 } from '../lib/calculator';
-import { FinancialAssessmentInputs } from '../types';
+import { FinancialAssessmentInputs, DreamLifeGoal } from '../types';
 
 describe('LifeMap Financial Calculation Engine (Team AspireX)', () => {
   const baseSample: FinancialAssessmentInputs = {
@@ -282,4 +286,115 @@ describe('LifeMap Financial Calculation Engine (Team AspireX)', () => {
     expect(projection.tenYear.moderate.nominal).toBe(0);
     expect(projection.twentyYear.moderate.nominal).toBe(0);
   });
+
+  // 17. DreamLife future goal cost with inflation
+  it('17. calculates compounded future goal cost accurately with inflation', () => {
+    // Current ₹1.5 Cr home at 6% inflation over 10 years: 1.5 Cr * (1.06)^10 = 26,862,715
+    const cost10Yr = calculateFutureGoalCost(15000000, 10, 0.06);
+    expect(cost10Yr).toBe(26862715);
+
+    // Zero inflation retains current cost
+    const zeroInfCost = calculateFutureGoalCost(1000000, 5, 0);
+    expect(zeroInfCost).toBe(1000000);
+
+    // Zero years retains current cost
+    const zeroYearsCost = calculateFutureGoalCost(1000000, 0, 0.06);
+    expect(zeroYearsCost).toBe(1000000);
+  });
+
+  // 18. Required monthly savings contribution (SIP) with zero-return & compounding
+  it('18. calculates required monthly contributions with payment timing & zero-return edge cases', () => {
+    // Zero return: ₹12 Lakhs needed in 1 year = ₹1,00,000 / month
+    const zeroReturnMonthly = calculateRequiredMonthlyContribution(1200000, 1, 0, 0);
+    expect(zeroReturnMonthly).toBe(100000);
+
+    // Compounded return: ₹10 Lakhs in 5 years at 10% annual return
+    const sipMonthly = calculateRequiredMonthlyContribution(1000000, 5, 0.10, 0);
+    expect(sipMonthly).toBeGreaterThan(0);
+    // Standard SIP needed is less than uncompounded ₹10L / 60mo = ₹16,667
+    expect(sipMonthly).toBeLessThan(16667);
+
+    // Existing dedicated savings reduces required contribution
+    const sipWithDedicated = calculateRequiredMonthlyContribution(1000000, 5, 0.10, 500000);
+    expect(sipWithDedicated).toBeLessThan(sipMonthly);
+  });
+
+  // 19. DreamLife 3 distinct scenario pathways
+  it('19. calculates 3 distinct scenarios: Current Path, Growth Path, and Priority Path', () => {
+    const sampleGoals: DreamLifeGoal[] = [
+      {
+        id: 'g1',
+        category: 'property',
+        title: 'New Family Villa',
+        description: 'Independent house',
+        targetYears: 10,
+        currentEstimatedCost: 15000000,
+        futureInflatedCost: 26862720,
+        estimateSource: 'user_supplied',
+        priority: 'essential'
+      },
+      {
+        id: 'g2',
+        category: 'vehicle',
+        title: 'Two Premium Cars',
+        description: 'Vehicles for family mobility',
+        targetYears: 5,
+        currentEstimatedCost: 3000000,
+        futureInflatedCost: 4014677,
+        estimateSource: 'user_supplied',
+        priority: 'flexible'
+      }
+    ];
+
+    const result = calculateDreamLifeScenarios({
+      goals: sampleGoals,
+      monthlyIncome: 150000,
+      monthlyExpenses: 60000,
+      liquidSavings: 1500000, // ₹15 Lakhs (reserves ₹3.6L for 6mo emergency fund)
+      inflationRate: 0.06,
+      nominalReturnRate: 0.10
+    });
+
+    // 1. Current Path
+    expect(result.currentPath.monthlySurplus).toBe(90000);
+    expect(result.currentPath.totalGoalsCount).toBe(2);
+
+    // 2. Growth Path should boost investable surplus and corpus
+    expect(result.growthPath.monthlySurplus).toBeGreaterThan(result.currentPath.monthlySurplus);
+    expect(result.growthPath.projectedCorpus10Yr).toBeGreaterThan(result.currentPath.projectedCorpus10Yr);
+
+    // 3. Priority Path should reduce immediate required contribution by postponing flexible goals
+    expect(result.priorityPath.targetMonthlyContribution).toBeLessThan(result.currentPath.targetMonthlyContribution);
+  });
+
+  // 20. Business idea explorer feasibility calculations
+  it('20. evaluates business venture break-even timeline and cash flow feasibility', () => {
+    // Profitable venture
+    const viable = calculateBusinessIdeaScenarios({
+      ideaTitle: 'Consulting Practice',
+      startupCapital: 600000, // ₹6 Lakhs
+      monthlyOperatingCosts: 40000,
+      monthlyRevenue: 100000,
+      profitMarginPct: 80 // 80% gross margin = ₹80,000 - ₹40,000 opex = ₹40,000 net/mo
+    });
+
+    expect(viable.isCashFlowPositive).toBe(true);
+    expect(viable.monthlyNetCashFlow).toBe(40000);
+    expect(viable.breakEvenMonths).toBe(15); // ₹6,00,000 / ₹40,000 = 15 months
+    expect(viable.cashFlowRunwayRecommended).toBe(600000 + 40000 * 6); // ₹8.4 Lakhs
+
+    // Unviable / negative cash flow venture
+    const unviable = calculateBusinessIdeaScenarios({
+      ideaTitle: 'High-Overhead Cafe',
+      startupCapital: 2000000,
+      monthlyOperatingCosts: 150000,
+      monthlyRevenue: 100000,
+      profitMarginPct: 50 // ₹50,000 gross - ₹1,50,000 opex = -₹1,00,000 net/mo
+    });
+
+    expect(unviable.isCashFlowPositive).toBe(false);
+    expect(unviable.monthlyNetCashFlow).toBeLessThan(0);
+    expect(unviable.breakEvenMonths).toBeNull();
+  });
 });
+

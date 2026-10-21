@@ -31,6 +31,19 @@ export interface MockSession {
   user: MockAuthUser;
 }
 
+export const hashPassword = (password: string): string => {
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  const salted = 'lifemap_sec_salt_v2:' + password;
+  for (let i = 0; i < salted.length; i++) {
+    const ch = salted.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(16, '0');
+};
+
 export class LocalSupabaseEngine {
   private users: Map<string, { user: MockAuthUser; passwordHash: string }> = new Map();
   private currentSession: MockSession | null = null;
@@ -59,7 +72,10 @@ export class LocalSupabaseEngine {
         if (savedUsers) {
           const parsed = JSON.parse(savedUsers);
           for (const item of parsed) {
-            this.users.set(item.email, { user: item.user, passwordHash: item.passwordHash });
+            const email = (item.email || item.user?.email || '').trim().toLowerCase();
+            if (email && item.user) {
+              this.users.set(email, { user: item.user, passwordHash: item.passwordHash });
+            }
           }
         }
         const savedSession = localStorage.getItem('lifemap_mock_session');
@@ -84,7 +100,11 @@ export class LocalSupabaseEngine {
   private persistToStorage() {
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
-        const usersArr = Array.from(this.users.values());
+        const usersArr = Array.from(this.users.entries()).map(([email, record]) => ({
+          email,
+          user: record.user,
+          passwordHash: record.passwordHash
+        }));
         localStorage.setItem('lifemap_mock_users', JSON.stringify(usersArr));
         if (this.currentSession) {
           localStorage.setItem('lifemap_mock_session', JSON.stringify(this.currentSession));
@@ -104,26 +124,31 @@ export class LocalSupabaseEngine {
   get auth() {
     return {
       signUp: async ({ email, password, options }: { email: string; password?: string; options?: any }) => {
-        if (!email || !password) {
+        const normEmail = (email || '').trim().toLowerCase();
+        if (!normEmail || !password) {
           return { data: { user: null, session: null }, error: new Error('Email and password are required.') };
         }
-        if (this.users.has(email)) {
+        if (!normEmail.includes('@') || !normEmail.includes('.')) {
+          return { data: { user: null, session: null }, error: new Error('Please enter a valid email address.') };
+        }
+        if (this.users.has(normEmail)) {
           return { data: { user: null, session: null }, error: new Error('User already registered.') };
         }
         const id = 'usr_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now();
         const user: MockAuthUser = {
           id,
-          email,
+          email: normEmail,
           user_metadata: options?.data || {},
           created_at: new Date().toISOString()
         };
-        this.users.set(email, { user, passwordHash: password });
+        const passwordHash = hashPassword(password);
+        this.users.set(normEmail, { user, passwordHash });
 
         // Auto trigger profile insert as defined by handle_new_user() in SQL migration
         this.tables.profiles.set(id, {
           id,
-          email,
-          name: options?.data?.name || email.split('@')[0],
+          email: normEmail,
+          name: options?.data?.name || normEmail.split('@')[0],
           preferred_language: options?.data?.preferred_language || 'en',
           created_at: user.created_at,
           updated_at: user.created_at
@@ -132,7 +157,7 @@ export class LocalSupabaseEngine {
         const session: MockSession = {
           access_token: 'tok_' + id,
           token_type: 'bearer',
-          expires_in: 3600,
+          expires_in: 86400,
           user
         };
         this.currentSession = session;
@@ -142,14 +167,28 @@ export class LocalSupabaseEngine {
       },
 
       signInWithPassword: async ({ email, password }: { email: string; password?: string }) => {
-        const record = this.users.get(email);
-        if (!record || record.passwordHash !== password) {
+        const normEmail = (email || '').trim().toLowerCase();
+        if (!normEmail || !password) {
+          return { data: { user: null, session: null }, error: new Error('Email and password are required.') };
+        }
+        const record = this.users.get(normEmail);
+        const passwordHash = hashPassword(password);
+        const isMatch = record && (record.passwordHash === passwordHash || record.passwordHash === password);
+
+        if (!record || !isMatch) {
           return { data: { user: null, session: null }, error: new Error('Invalid login credentials.') };
         }
+
+        // Upgrade legacy hash if necessary
+        if (record.passwordHash === password) {
+          record.passwordHash = passwordHash;
+          this.users.set(normEmail, record);
+        }
+
         const session: MockSession = {
           access_token: 'tok_' + record.user.id,
           token_type: 'bearer',
-          expires_in: 3600,
+          expires_in: 86400,
           user: record.user
         };
         this.currentSession = session;

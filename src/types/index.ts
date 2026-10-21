@@ -21,10 +21,15 @@ export type GoalCategory =
   | 'spouse' 
   | 'children_support' 
   | 'education' 
+  | 'home'
   | 'home_loan' 
   | 'other_loan' 
   | 'household_living' 
   | 'family_independence' 
+  | 'retirement'
+  | 'wealth'
+  | 'emergency'
+  | 'vehicle'
   | 'custom';
 
 export type GoalPriority = 'essential' | 'high' | 'medium' | 'flexible';
@@ -333,4 +338,117 @@ export interface GrowthProjectionResult {
     formulaSummary: string;
   };
 }
+
+// -------------------------------------------------------------
+// DreamLife AI Signature Feature Types (Voice-First & Scenarios)
+// -------------------------------------------------------------
+
+export type DreamGoalCategory =
+  | 'property'
+  | 'vehicle'
+  | 'investment'
+  | 'business'
+  | 'education'
+  | 'family'
+  | 'retirement'
+  | 'travel'
+  | 'debt_repayment'
+  | 'emergency_fund'
+  | 'other';
+
+export type EstimateSourceType =
+  | 'user_supplied'
+  | 'reliable_benchmark'
+  | 'illustrative_assumption'
+  | 'unknown_needs_clarification';
+
+export interface DreamLifeGoal {
+  id: string;
+  category: DreamGoalCategory;
+  title: string;
+  description: string;
+  targetYears: number; // e.g. 5, 10, 20
+  currentEstimatedCost: number; // Present day value in INR
+  futureInflatedCost: number; // Compounded by inflation: Cost * (1 + inf)^t
+  estimateSource: EstimateSourceType;
+  priority: 'essential' | 'high' | 'medium' | 'flexible';
+  missingInfo?: string;
+  isCustom?: boolean;
+  allocatedSavings?: number;
+  originalTranscriptSnippet?: string;
+}
+
+export interface DreamLifeScenarioInputs {
+  goals: DreamLifeGoal[];
+  monthlyIncome: number;
+  monthlyExpenses: number;
+  liquidSavings: number;
+  inflationRate: number;
+  nominalReturnRate?: number; // e.g. 0.10 for 10%
+  growthSavingsRateBoostPct?: number; // e.g. +10% higher savings rate
+  growthIncomeGrowthRatePct?: number; // e.g. +8% annual salary increase
+  priorityPostponeYears?: number; // postpone medium/flexible goals
+}
+
+export interface DreamLifeScenarioSummary {
+  id: 'current_path' | 'growth_path' | 'priority_path';
+  title: string;
+  tagline: string;
+  monthlySurplus: number;
+  targetMonthlyContribution: number;
+  shortfallPerMonth: number;
+  totalGoalCostNominal: number;
+  totalGoalCostFuture: number;
+  projectedCorpus10Yr: number;
+  projectedCorpus20Yr: number;
+  fundedGoalsCount: number;
+  totalGoalsCount: number;
+  potentialShortfall: number;
+  timelineHighlights: string[];
+  assumptions: string[];
+  fundedGoalIds: string[];
+  unfundedGoalIds: string[];
+}
+
+export interface BusinessIdeaInputs {
+  ideaTitle: string;
+  startupCapital: number;
+  monthlyOperatingCosts: number;
+  monthlyRevenue: number;
+  profitMarginPct: number;
+}
+
+export interface BusinessIdeaResult {
+  ideaTitle: string;
+  startupCapital: number;
+  monthlyOperatingCosts: number;
+  monthlyRevenue: number;
+  profitMarginPct: number;
+  monthlyGrossProfit: number;
+  monthlyNetCashFlow: number;
+  breakEvenMonths: number | null;
+  cashFlowRunwayRecommended: number;
+  isCashFlowPositive: boolean;
+  scenarios: {
+    conservative: { revenue: number; netCashFlow: number; breakEvenMonths: number | null };
+    base: { revenue: number; netCashFlow: number; breakEvenMonths: number | null };
+    optimistic: { revenue: number; netCashFlow: number; breakEvenMonths: number | null };
+  };
+  risksAndMitigations: string[];
+  disclaimer: string;
+}
+
+export interface PersonalizedEducationalResource {
+  id: string;
+  title: string;
+  authorOrSource: string;
+  type: 'book' | 'biography' | 'educational_guide';
+  theme: 'budgeting' | 'wealth_goals' | 'entrepreneurship' | 'investing' | 'behavioral_finance';
+  description: string;
+  verifiedSourceUrl: string;
+  keyLesson: string;
+  planningTradeoff: string;
+  targetAudience: string;
+}
+
 
